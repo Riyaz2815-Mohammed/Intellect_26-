@@ -156,8 +156,8 @@ export function GameProvider({ children }) {
 
             // CHECK ROUND COMPLETION CONDITIONS
             if (state.round === 1 && state.stage === 5) return completeRound(result.points);
-            if (state.round === 2 && state.stage === 3) return completeRound(result.points);
-            if (state.round === 3 && state.stage === 4) return completeRound(result.points);
+            if (state.round === 2 && state.stage === 5) return completeRound(result.points);
+            if (state.round === 3 && state.stage === 6) return completeRound(result.points);
 
             // ROUND 4 SPECIFIC LOGIC
             if (state.round === 4) {

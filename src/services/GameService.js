@@ -1,5 +1,5 @@
 import { normalizeSQL, SQL_CHALLENGES, ROUND1_CODE, ROUND1_PLACE } from '../data/round1';
-import { AGENTS_TABLE, ACCESS_LOGS_TABLE, ROUND2_QUESTIONS } from '../data/round2';
+import { COLLEGE_DATA, ROUND2_QUESTIONS, normalizeQuery, ROUND2_CODE, ROUND2_PLACE } from '../data/round2';
 import { ROUND3_QUESTIONS, ROUND3_CODE, ROUND3_PLACE } from '../data/round3';
 import { ROUND4_QUESTIONS, validateAllAnswers, ROUND4_PLACE } from '../data/round4';
 
@@ -31,15 +31,30 @@ export const GameService = {
             }
         }
 
-        // Round 2 Logic: Data Analysis
+        // Round 2 Logic: SQL Query Writing
         if (round === 2) {
-            if (stage <= 3) {
+            if (stage <= 4) {
                 const question = ROUND2_QUESTIONS[stage - 1];
-                // Exact string match, case insensitive
-                if (input.trim().toUpperCase() === question.answer.toUpperCase()) {
-                    return { success: true, points: 100, message: 'CALCULATION VERIFIED' };
+                // Normalize and Validate
+                const cleanInput = normalizeQuery(input);
+
+                // Check required
+                const missing = question.validation.required.find(t => !cleanInput.includes(t));
+                if (missing) return { success: false, message: `SYNTAX ERROR: Missing '${missing.toUpperCase()}'` };
+
+                // Check forbidden
+                const forbidden = question.validation.forbidden.find(t => cleanInput.includes(t));
+                if (forbidden) return { success: false, message: `SYNTAX ERROR: Usage of '${forbidden.toUpperCase()}' is restricted` };
+
+                return { success: true, points: 100, message: 'QUERY EXECUTED SUCCESSFULLY' };
+            }
+
+            // Stage 5: Code Entry
+            if (stage === 5) {
+                if (input.trim().toUpperCase() === ROUND2_CODE) {
+                    return { success: true, points: 200, message: 'ACCESS GRANTED: ROUND COMPLETE' };
                 } else {
-                    return { success: false, message: 'LOGIC ERROR: INCORRECT RESULT' };
+                    return { success: false, message: 'INVALID LOCATION CODE' };
                 }
             }
         }
@@ -174,32 +189,32 @@ export const GameService = {
         }
 
         if (round === 2) {
-            if (stage >= 1 && stage <= 3) {
+            if (stage >= 1 && stage <= 4) {
                 const question = ROUND2_QUESTIONS[stage - 1];
-                if (!question) return null; // Safety check
+                if (!question) return null;
 
                 return {
                     type: 'DATA_ANALYSIS',
-                    title: `LOGIC PROBE [${stage}/3]`,
+                    title: `ACADEMIC PERFORMANCE ANALYSIS [${stage}/4]`,
                     content: question.text,
                     hint: question.hint,
-                    tables: { agents: AGENTS_TABLE, logs: ACCESS_LOGS_TABLE },
-                    placeholder: 'Enter calculated value...'
-                }
+                    tables: COLLEGE_DATA,
+                    placeholder: 'SELECT ... FROM students ...'
+                };
             }
-            if (stage === 4) {
+            if (stage === 5) {
                 return {
-                    type: 'ROUND_COMPLETE',
-                    title: 'ROUND 2 COMPLETE',
-                    content: 'LOGIC CORE STABILIZED. ROUND 3 UNLOCKING...',
-                    hint: 'Prepare for memory pressure testing.',
-                    placeholder: 'SYSTEM LOCKED'
-                }
+                    type: 'LOCATION_REVEAL',
+                    title: 'PHYSICAL ACCESS REQUIRED',
+                    content: 'ENCRYPTED FRAGMENT LOCATED',
+                    hint: 'Proceed to location to retrieve unlock key.',
+                    location: ROUND2_PLACE
+                };
             }
         }
 
         if (round === 3) {
-            if (stage <= 3) {
+            if (stage <= 5) {
                 const question = ROUND3_QUESTIONS[stage - 1];
                 return {
                     type: 'FLASH_CHALLENGE',
@@ -212,7 +227,7 @@ export const GameService = {
                     placeholder: question.type === 'QUERY_FLASH' ? 'Type the query...' : 'Enter your answer...'
                 };
             }
-            if (stage === 4) {
+            if (stage === 6) {
                 return {
                     type: 'LOCATION_REVEAL',
                     title: 'PHYSICAL RETRIEVAL AUTHORIZED',

@@ -383,53 +383,35 @@ const GameScreen = () => {
             return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <div style={{ flex: 1, minWidth: '300px', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                            <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.5rem', fontFamily: 'var(--font-code)' }}>TABLE: AGENTS</h4>
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-code)' }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
-                                            {Object.keys(levelData.tables.agents[0]).map(key => (
-                                                <th key={key} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>{key.toUpperCase()}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {levelData.tables.agents.map((row, i) => (
-                                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                {Object.values(row).map((val, j) => (
-                                                    <td key={j} style={{ padding: '0.5rem' }}>{val}</td>
+                        {Object.entries(levelData.tables).map(([tableName, rows]) => (
+                            <div key={tableName} style={{ flex: 1, minWidth: '300px', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                                <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.5rem', fontFamily: 'var(--font-code)' }}>
+                                    TABLE: {tableName.toUpperCase()}
+                                </h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-code)' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
+                                                {rows.length > 0 && Object.keys(rows[0]).map(key => (
+                                                    <th key={key} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>
+                                                        {key.toUpperCase()}
+                                                    </th>
                                                 ))}
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: '300px', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                            <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.5rem', fontFamily: 'var(--font-code)' }}>TABLE: ACCESS_LOGS</h4>
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-code)' }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
-                                            {Object.keys(levelData.tables.logs[0]).map(key => (
-                                                <th key={key} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>{key.toUpperCase()}</th>
+                                        </thead>
+                                        <tbody>
+                                            {rows.map((row, i) => (
+                                                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    {Object.values(row).map((val, j) => (
+                                                        <td key={j} style={{ padding: '0.5rem' }}>{val}</td>
+                                                    ))}
+                                                </tr>
                                             ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {levelData.tables.logs.map((row, i) => (
-                                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                {Object.values(row).map((val, j) => (
-                                                    <td key={j} style={{ padding: '0.5rem' }}>{val}</td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
+                        ))}
                     </div>
 
                     <div style={{
