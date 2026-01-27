@@ -312,19 +312,19 @@ const GameScreen = () => {
         setShowRetry(false);
     }, [state.round, state.stage]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (state.roundEndsAt && timeLeft === 0) return;
 
-        const success = submitAnswer(input);
-        if (!success) {
+        const result = await submitAnswer(input);
+        if (!result.success) {
             setShowRetry(true);
         }
     };
 
-    const handleDragDropSubmit = (query) => {
-        const success = submitAnswer(query);
-        if (!success) {
+    const handleDragDropSubmit = async (query) => {
+        const result = await submitAnswer(query);
+        if (!result.success) {
             setShowRetry(true);
         }
     };
@@ -334,9 +334,9 @@ const GameScreen = () => {
         setShowRetry(false);
     };
 
-    const handleRound4Submit = (answers, setIncorrectQuestions) => {
-        const result = submitAnswer(JSON.stringify(answers));
-        if (result && !result.success && result.incorrectQuestions) {
+    const handleRound4Submit = async (answers, setIncorrectQuestions) => {
+        const result = await submitAnswer(JSON.stringify(answers));
+        if (!result.success && result.incorrectQuestions) {
             setIncorrectQuestions(result.incorrectQuestions);
             setShowRetry(true);
         }
@@ -484,6 +484,19 @@ const GameScreen = () => {
                     }}>
                         📧 CHECK YOUR EMAIL
                     </div>
+                    {levelData.location && (
+                        <div style={{
+                            fontSize: '1.5rem',
+                            color: 'var(--accent-warning)',
+                            marginBottom: '1.5rem',
+                            padding: '1rem',
+                            background: 'rgba(255, 204, 0, 0.1)',
+                            border: '1px dashed var(--accent-warning)',
+                            fontFamily: 'var(--font-code)'
+                        }}>
+                            📍 LOCATION: {levelData.location}
+                        </div>
+                    )}
                     <p style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>{levelData.content}</p>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                         {levelData.hint}

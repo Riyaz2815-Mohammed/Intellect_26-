@@ -146,3 +146,4 @@ export const validateAllAnswers = (answers) => {
         };
     }
 };
+export const ROUND4_PLACE = "RUDRA BLOCK";

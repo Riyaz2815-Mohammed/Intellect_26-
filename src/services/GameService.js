@@ -1,7 +1,7 @@
-import { normalizeSQL, SQL_CHALLENGES, ROUND1_CODE } from '../data/round1';
+import { normalizeSQL, SQL_CHALLENGES, ROUND1_CODE, ROUND1_PLACE } from '../data/round1';
 import { AGENTS_TABLE, ACCESS_LOGS_TABLE, ROUND2_QUESTIONS } from '../data/round2';
-import { ROUND3_QUESTIONS, ROUND3_CODE } from '../data/round3';
-import { ROUND4_QUESTIONS, validateAllAnswers } from '../data/round4';
+import { ROUND3_QUESTIONS, ROUND3_CODE, ROUND3_PLACE } from '../data/round3';
+import { ROUND4_QUESTIONS, validateAllAnswers, ROUND4_PLACE } from '../data/round4';
 
 // Simulated Backend Service
 export const GameService = {
@@ -159,7 +159,7 @@ export const GameService = {
                     title: 'TARGET LOCATION IDENTIFIED',
                     content: 'PHYSICAL ACCESS REQUIRED',
                     hint: 'Go to location and retrieve the code',
-                    location: "LIBRARY - SECTION B" // Hardcoded place as requested
+                    location: ROUND1_PLACE
                 };
             }
             if (stage === 6) {
@@ -218,7 +218,7 @@ export const GameService = {
                     title: 'PHYSICAL RETRIEVAL AUTHORIZED',
                     content: 'ONE TEAM MEMBER MUST RETRIEVE CODE',
                     hint: 'Go to location immediately',
-                    location: "OPEN AUDITORIUM"
+                    location: ROUND3_PLACE
                 };
             }
             if (stage === 5) {
@@ -247,7 +247,8 @@ export const GameService = {
                 return {
                     type: 'EMAIL_CODE_ENTRY',
                     title: 'ADVANTAGE CODE VERIFICATION',
-                    content: 'Check your registered email for the advantage code',
+                    content: 'Check your email OR visit location for code',
+                    location: ROUND4_PLACE,
                     hint: 'Code format: INT26-R4-XXXX',
                     placeholder: 'Enter code from email...'
                 };

@@ -48,5 +48,5 @@ export const ROUND3_QUESTIONS = [
     }
 ];
 
-export const ROUND3_PLACE = "OPEN AUDITORIUM";
+export const ROUND3_PLACE = "OPEN AUDI";
 export const ROUND3_CODE = "CRPT-9384"; // Team-specific in real implementation

@@ -5,6 +5,23 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
     const [orderedFragments, setOrderedFragments] = useState([]);
     const [draggedItem, setDraggedItem] = useState(null);
 
+    // Reset state when fragments prop changes (e.g. next stage)
+    React.useEffect(() => {
+        setAvailableFragments([...fragments]);
+        setOrderedFragments([]);
+        setDraggedItem(null);
+    }, [fragments]);
+
+    const handleItemClick = (fragment, source) => {
+        if (source === 'available') {
+            setAvailableFragments(prev => prev.filter(f => f !== fragment));
+            setOrderedFragments(prev => [...prev, fragment]);
+        } else if (source === 'ordered') {
+            setOrderedFragments(prev => prev.filter(f => f !== fragment));
+            setAvailableFragments(prev => [...prev, fragment]);
+        }
+    };
+
     const handleDragStart = (e, fragment, source) => {
         setDraggedItem({ fragment, source });
         e.dataTransfer.effectAllowed = 'move';
@@ -99,6 +116,7 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                                 key={`avail-${idx}`}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, fragment, 'available')}
+                                onClick={() => handleItemClick(fragment, 'available')}
                                 style={{
                                     background: 'var(--bg-tertiary)',
                                     padding: '0.75rem',
@@ -161,6 +179,7 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                                     <div
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, fragment, 'ordered')}
+                                        onClick={() => handleItemClick(fragment, 'ordered')}
                                         style={{
                                             background: 'var(--bg-secondary)',
                                             padding: '0.75rem',

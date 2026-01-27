@@ -1,16 +1,32 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
+// Round Shuffling Configuration
+// Round Shuffling Configuration (Rounds 1-4 are shuffled)
+const ROUND_PATHS = [
+    [1, 2, 3, 4], // Path A
+    [2, 3, 4, 1], // Path B
+    [3, 4, 1, 2], // Path C
+    [4, 1, 2, 3]  // Path D
+];
+
+const getRoundPath = (teamId) => {
+    if (!teamId) return ROUND_PATHS[0];
+    const sum = teamId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return ROUND_PATHS[sum % ROUND_PATHS.length];
+};
+
 // Initial State
 const initialState = {
-    screen: 'WELCOME', // WELCOME, LOGIN, LOBBY, GAME, SUCCESS, DNF
+    screen: 'WELCOME',
     teamId: null,
     teamName: null,
-    teamEmail: null, // Added for Round 4 email delivery
+    teamEmail: null,
     round: 0,
     stage: 0,
     score: 0,
     lastSubmission: null,
     error: null,
+    roundPath: ROUND_PATHS[0], // Default path
 };
 
 // Actions
@@ -27,21 +43,25 @@ const ACTION = {
 function gameReducer(state, action) {
     switch (action.type) {
         case ACTION.LOGIN:
+            const assignedPath = getRoundPath(action.payload.id);
             return {
                 ...state,
                 screen: 'LOBBY',
                 teamId: action.payload.id,
                 teamName: action.payload.name,
                 teamEmail: action.payload.email,
+                roundPath: assignedPath,
                 error: null,
             };
         case ACTION.START_ROUND:
+            // If round 0 (Start Game), pick the first round from assigned path
+            const targetRound = action.payload.round === 0 ? state.roundPath[0] : action.payload.round;
             return {
                 ...state,
                 screen: 'GAME',
-                round: action.payload.round,
-                stage: 1, // Reset stage on new round
-                roundEndsAt: Date.now() + (action.payload.duration || 600) * 1000, // Default 10 mins
+                round: targetRound,
+                stage: 1,
+                roundEndsAt: Date.now() + (action.payload.duration || 600) * 1000,
                 error: null,
             };
         case ACTION.NEXT_STAGE:
@@ -76,13 +96,15 @@ export function GameProvider({ children }) {
         const persisted = localStorage.getItem('CODECRYPT_STATE');
         if (persisted) {
             const parsed = JSON.parse(persisted);
-            // Reset ephemeral state
+            // Ensure roundPath exists for restored state (backward compatibility)
+            if (!parsed.roundPath && parsed.teamId) {
+                parsed.roundPath = getRoundPath(parsed.teamId);
+            }
             return { ...parsed, error: null };
         }
         return defaultState;
     });
 
-    // Debug logging & Persistence
     useEffect(() => {
         console.log('Game State Updated:', state);
         localStorage.setItem('CODECRYPT_STATE', JSON.stringify(state));
@@ -100,51 +122,81 @@ export function GameProvider({ children }) {
         dispatch({ type: ACTION.START_ROUND, payload: { round: roundNumber, duration } });
     };
 
+    const getNextRound = (currentRound) => {
+        const path = state.roundPath || ROUND_PATHS[0];
+        const currentIndex = path.indexOf(currentRound);
+
+        if (currentIndex !== -1 && currentIndex < (path.length - 1)) {
+            // Move to next round in the shuffled path
+            return path[currentIndex + 1];
+        } else {
+            // Path complete (all 4 done), move to Round 5 (Final)
+            return 5;
+        }
+    };
+
     const submitAnswer = async (answer) => {
-        // RESET ERROR ON SUBMIT
         dispatch({ type: ACTION.SET_ERROR, payload: null });
 
         const result = GameService.validateSubmission(state.round, state.stage, answer);
 
         if (result.success) {
-            // Check if this was a round completion
-            if (state.round === 1 && state.stage === 5) {
-                // Round 1 Code entered → Move to Round 2
-                dispatch({ type: ACTION.ADMIN_OVERRIDE, payload: { round: 2, stage: 1, score: state.score + result.points, error: null } });
-            } else if (state.round === 2 && state.stage === 3) {
-                // Round 2 Q3 complete → Move to Round 3
-                dispatch({ type: ACTION.ADMIN_OVERRIDE, payload: { round: 3, stage: 1, score: state.score + result.points, error: null } });
-            } else if (state.round === 3 && state.stage === 4) {
-                // Round 3 Physical Code entered → Move to Round 4
-                dispatch({ type: ACTION.ADMIN_OVERRIDE, payload: { round: 4, stage: 1, score: state.score + result.points, error: null } });
-            } else if (state.round === 4 && state.stage === 1 && result.triggerEmail) {
-                // Round 4 All questions correct → Send email with code
-                const emailResult = await EmailService.sendAdvantageCode(
-                    state.teamId,
-                    state.teamEmail,
-                    state.teamName
-                );
+            // ROUND COMPLETION HELPER
+            const completeRound = (pointsToAdd = 0, msg = null) => {
+                const nextRound = getNextRound(state.round);
+                const nextStage = nextRound === 5 ? 0 : 1;
+                console.log(`Round ${state.round} Complete. Moving to Round ${nextRound}`);
 
-                if (emailResult.success) {
-                    console.log('📧 Email sent successfully! Code:', emailResult.code);
-                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
-                } else {
-                    dispatch({ type: ACTION.SET_ERROR, payload: 'Email sending failed. Contact admin.' });
+                dispatch({
+                    type: ACTION.ADMIN_OVERRIDE,
+                    payload: { round: nextRound, stage: nextStage, score: state.score + pointsToAdd, error: null }
+                });
+                return { success: true, message: msg || 'ROUND COMPLETE' };
+            };
+
+            // CHECK ROUND COMPLETION CONDITIONS
+            if (state.round === 1 && state.stage === 5) return completeRound(result.points);
+            if (state.round === 2 && state.stage === 3) return completeRound(result.points);
+            if (state.round === 3 && state.stage === 4) return completeRound(result.points);
+
+            // ROUND 4 SPECIFIC LOGIC
+            if (state.round === 4) {
+                if (state.stage === 1 && result.triggerEmail) {
+                    const emailResult = await EmailService.sendAdvantageCode(state.teamId, state.teamEmail, state.teamName);
+                    if (emailResult.success) {
+                        dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                    } else {
+                        dispatch({ type: ACTION.SET_ERROR, payload: 'Email failed.' });
+                        return result;
+                    }
                     return result;
                 }
-            } else if (state.round === 4 && state.stage === 2) {
-                // Round 4 Email code verification
-                const isValid = EmailService.validateCode(state.teamId, answer);
-                if (isValid) {
-                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: 200 } });
-                    return { success: true, message: 'ADVANTAGE CODE VERIFIED - FINAL ROUND UNLOCKED' };
-                } else {
-                    dispatch({ type: ACTION.SET_ERROR, payload: 'INVALID ADVANTAGE CODE' });
-                    return { success: false, message: 'INVALID ADVANTAGE CODE' };
+                if (state.stage === 2) {
+                    const isValid = EmailService.validateCode(state.teamId, answer);
+                    if (isValid) {
+                        return completeRound(200, 'ADVANTAGE CODE VERIFIED');
+                    } else {
+                        dispatch({ type: ACTION.SET_ERROR, payload: 'INVALID CODE' });
+                        return { success: false, message: 'INVALID CODE' };
+                    }
                 }
-            } else {
-                dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
             }
+
+            // SPECIAL CHECK FOR ROUND 5 WINNER
+            if (state.round === 5 && state.stage === 10 && result.isWinner) {
+                dispatch({
+                    type: ACTION.ADMIN_OVERRIDE, payload: {
+                        screen: 'SUCCESS',
+                        score: state.score + result.points,
+                        completionTime: new Date().toISOString(),
+                        isWinner: true
+                    }
+                });
+                return result;
+            }
+
+            // Normal Stage Progression
+            dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
             return result;
         } else {
             dispatch({ type: ACTION.SET_ERROR, payload: result.message });
