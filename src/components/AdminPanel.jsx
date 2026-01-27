@@ -106,6 +106,26 @@ const AdminPanel = () => {
             <div style={{ marginTop: '1rem', fontSize: '0.6rem', color: '#555', wordBreak: 'break-all' }}>
                 CURRENT: {JSON.stringify({ screen: state.screen, r: state.round, s: state.stage, score: state.score })}
             </div>
+
+            {state.round === 4 && state.teamId && (
+                <div style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem',
+                    background: 'rgba(0, 255, 65, 0.1)',
+                    border: '1px solid var(--accent-primary)',
+                    borderRadius: '4px'
+                }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', marginBottom: '0.25rem' }}>
+                        📧 ROUND 4 CODE:
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--accent-primary)', fontFamily: 'var(--font-code)' }}>
+                        {localStorage.getItem(`ROUND4_CODE_${state.teamId}`) || 'Not generated yet'}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: '#888', marginTop: '0.25rem' }}>
+                        Check browser console for email log
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

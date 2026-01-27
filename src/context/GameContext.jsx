@@ -67,6 +67,7 @@ function gameReducer(state, action) {
 }
 
 import { GameService } from '../services/GameService';
+import { EmailService } from '../services/EmailService';
 
 const GameContext = createContext();
 
@@ -99,7 +100,7 @@ export function GameProvider({ children }) {
         dispatch({ type: ACTION.START_ROUND, payload: { round: roundNumber, duration } });
     };
 
-    const submitAnswer = (answer) => {
+    const submitAnswer = async (answer) => {
         // RESET ERROR ON SUBMIT
         dispatch({ type: ACTION.SET_ERROR, payload: null });
 
@@ -117,13 +118,30 @@ export function GameProvider({ children }) {
                 // Round 3 Physical Code entered → Move to Round 4
                 dispatch({ type: ACTION.ADMIN_OVERRIDE, payload: { round: 4, stage: 1, score: state.score + result.points, error: null } });
             } else if (state.round === 4 && state.stage === 1 && result.triggerEmail) {
-                // Round 4 All questions correct → Move to email code entry
-                // In production, backend would send email here
-                dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
-                console.log('📧 Email would be sent here with advantage code');
+                // Round 4 All questions correct → Send email with code
+                const emailResult = await EmailService.sendAdvantageCode(
+                    state.teamId,
+                    state.teamEmail,
+                    state.teamName
+                );
+
+                if (emailResult.success) {
+                    console.log('📧 Email sent successfully! Code:', emailResult.code);
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                } else {
+                    dispatch({ type: ACTION.SET_ERROR, payload: 'Email sending failed. Contact admin.' });
+                    return result;
+                }
             } else if (state.round === 4 && state.stage === 2) {
-                // Round 4 Email code verified → Complete
-                dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                // Round 4 Email code verification
+                const isValid = EmailService.validateCode(state.teamId, answer);
+                if (isValid) {
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: 200 } });
+                    return { success: true, message: 'ADVANTAGE CODE VERIFIED - FINAL ROUND UNLOCKED' };
+                } else {
+                    dispatch({ type: ACTION.SET_ERROR, payload: 'INVALID ADVANTAGE CODE' });
+                    return { success: false, message: 'INVALID ADVANTAGE CODE' };
+                }
             } else {
                 dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
             }
