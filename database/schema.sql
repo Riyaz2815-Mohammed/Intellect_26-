@@ -9,9 +9,10 @@ DROP TABLE IF EXISTS teams;
 -- Teams Table
 CREATE TABLE teams (
     team_id VARCHAR(20) PRIMARY KEY,
-    team_name VARCHAR(100) NOT NULL,
+    team_name VARCHAR(100) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
-    access_code VARCHAR(100) NOT NULL,
+    login_code VARCHAR(100) NOT NULL,
+    access_code VARCHAR(100) NOT NULL,  -- Keep for backward compatibility
     current_round INT DEFAULT 1,
     current_stage INT DEFAULT 1,
     total_score INT DEFAULT 0,
@@ -19,6 +20,7 @@ CREATE TABLE teams (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email),
+    INDEX idx_team_name (team_name),
     INDEX idx_active (is_active)
 );
 
@@ -31,6 +33,7 @@ CREATE TABLE team_progress (
     status ENUM('in_progress', 'completed', 'failed') DEFAULT 'in_progress',
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP NULL,
+    time_taken_seconds INT DEFAULT 0,
     FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
     INDEX idx_team_round (team_id, round),
     UNIQUE KEY unique_team_round_stage (team_id, round, stage)
@@ -45,8 +48,10 @@ CREATE TABLE submissions (
     submitted_answer TEXT,
     is_correct BOOLEAN NOT NULL,
     points_awarded INT DEFAULT 0,
+    time_bonus INT DEFAULT 0,
     error_message VARCHAR(255),
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    time_taken_seconds INT DEFAULT 0,
     FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
     INDEX idx_team_submissions (team_id, submitted_at),
     INDEX idx_round_stage (round, stage)
@@ -93,10 +98,10 @@ INSERT INTO event_config (config_key, config_value) VALUES
 ('registration_open', 'true');
 
 -- Sample Teams (for testing)
-INSERT INTO teams (team_id, team_name, email, access_code) VALUES
-('TM-001', 'Code Warriors', 'team1@example.com', 'warrior123'),
-('TM-002', 'Debug Masters', 'team2@example.com', 'debug456'),
-('TM-003', 'SQL Ninjas', 'team3@example.com', 'ninja789');
+INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES
+('TM-001', 'Code Warriors', 'team1@example.com', 'LOGIN-2401', 'warrior123'),
+('TM-002', 'Debug Masters', 'team2@example.com', 'LOGIN-2402', 'debug456'),
+('TM-003', 'SQL Ninjas', 'team3@example.com', 'LOGIN-2403', 'ninja789');
 
 -- Sample Physical Codes
 INSERT INTO physical_codes (team_id, round, code) VALUES

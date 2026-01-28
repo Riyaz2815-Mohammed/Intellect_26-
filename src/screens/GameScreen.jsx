@@ -416,6 +416,409 @@ const Round4MultiQuestion = ({ levelData, onSubmitAll }) => {
     );
 };
 
+// Round 4 Phase 1: Query Matching Component
+const QueryMatchingComponent = ({ levelData, onSubmit }) => {
+    const [mapping, setMapping] = useState({});
+    const [incorrectQueries, setIncorrectQueries] = useState([]);
+
+    const handleOutputSelect = (queryId, outputId) => {
+        setMapping(prev => ({ ...prev, [queryId]: outputId }));
+    };
+
+    const handleSubmit = () => {
+        onSubmit(mapping, setIncorrectQueries);
+    };
+
+    const renderTables = (tables) => {
+        return Object.entries(tables).map(([tableName, tableData]) => {
+            if (!tableData || tableData.length === 0) return null;
+
+            return (
+                <div key={tableName} style={{
+                    background: 'var(--bg-secondary)',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                    marginBottom: '1rem'
+                }}>
+                    <h4 style={{
+                        color: 'var(--accent-secondary)',
+                        marginBottom: '0.75rem',
+                        fontFamily: 'var(--font-code)',
+                        fontSize: '0.9rem'
+                    }}>
+                        TABLE: {tableName.toUpperCase()}
+                    </h4>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            fontSize: '0.8rem',
+                            fontFamily: 'var(--font-code)'
+                        }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid var(--accent-primary)', textAlign: 'left' }}>
+                                    {Object.keys(tableData[0]).map(key => (
+                                        <th key={key} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>
+                                            {key.toUpperCase()}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tableData.map((row, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        {Object.values(row).map((val, j) => (
+                                            <td key={j} style={{ padding: '0.5rem' }}>{val}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        });
+    };
+
+    const renderOutput = (output) => {
+        if (!output.data || output.data.length === 0) return null;
+
+        return (
+            <div style={{
+                background: 'var(--bg-tertiary)',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-subtle)',
+                marginTop: '0.5rem'
+            }}>
+                <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '0.75rem',
+                    fontFamily: 'var(--font-code)'
+                }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
+                            {Object.keys(output.data[0]).map(key => (
+                                <th key={key} style={{ padding: '0.4rem', color: 'var(--accent-secondary)' }}>
+                                    {key.toUpperCase()}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {output.data.map((row, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                {Object.values(row).map((val, j) => (
+                                    <td key={j} style={{ padding: '0.4rem' }}>{val}</td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Info Banner */}
+            <div style={{
+                background: 'rgba(0, 255, 204, 0.05)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--accent-secondary)',
+                textAlign: 'center'
+            }}>
+                <p style={{ color: 'var(--accent-secondary)', fontSize: '0.95rem' }}>
+                    {levelData.subtitle}
+                </p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                    ⏱ No time limit • 📊 All tables visible • ✅ All matches must be correct
+                </p>
+            </div>
+
+            {/* Tables Section */}
+            <div>
+                <h3 style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>📊 Reference Tables</h3>
+                {renderTables(levelData.tables)}
+            </div>
+
+            {/* Queries and Outputs Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {/* Queries Column */}
+                <div>
+                    <h3 style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>🔍 SQL Queries</h3>
+                    {levelData.queries.map((query) => (
+                        <div key={query.id} style={{
+                            background: incorrectQueries.includes(query.id)
+                                ? 'rgba(255, 51, 51, 0.05)'
+                                : 'var(--bg-secondary)',
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md)',
+                            border: incorrectQueries.includes(query.id)
+                                ? '2px solid var(--accent-error)'
+                                : '1px solid var(--border-subtle)',
+                            marginBottom: '1rem'
+                        }}>
+                            <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.5rem' }}>
+                                {query.label}
+                            </h4>
+                            <pre style={{
+                                background: 'var(--bg-tertiary)',
+                                padding: '0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.8rem',
+                                fontFamily: 'var(--font-code)',
+                                color: 'var(--text-primary)',
+                                overflowX: 'auto',
+                                whiteSpace: 'pre-wrap',
+                                marginBottom: '0.75rem'
+                            }}>
+                                {query.sql}
+                            </pre>
+                            <select
+                                value={mapping[query.id] || ''}
+                                onChange={(e) => handleOutputSelect(query.id, e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    background: 'var(--bg-primary)',
+                                    border: '1px solid var(--accent-primary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontFamily: 'var(--font-code)'
+                                }}
+                            >
+                                <option value="">Select output...</option>
+                                {levelData.outputs.map(output => (
+                                    <option key={output.id} value={output.id}>
+                                        {output.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Outputs Column */}
+                <div>
+                    <h3 style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>📤 Query Outputs</h3>
+                    {levelData.outputs.map((output) => (
+                        <div key={output.id} style={{
+                            background: 'var(--bg-secondary)',
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border-subtle)',
+                            marginBottom: '1rem'
+                        }}>
+                            <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.5rem' }}>
+                                {output.label}
+                            </h4>
+                            {renderOutput(output)}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+                onClick={handleSubmit}
+                className="btn btn-primary"
+                style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
+                disabled={Object.keys(mapping).length !== levelData.queries.length}
+            >
+                SUBMIT MATCHES ({Object.keys(mapping).length}/{levelData.queries.length})
+            </button>
+        </div>
+    );
+};
+
+// Round 4 Phase 2: Query Fixing Component
+const QueryFixingComponent = ({ levelData, onSubmitAll }) => {
+    const [answers, setAnswers] = useState(['', '', '', '', '']);
+    const [incorrectQuestions, setIncorrectQuestions] = useState([]);
+
+    const handleAnswerChange = (index, value) => {
+        const newAnswers = [...answers];
+        newAnswers[index] = value;
+        setAnswers(newAnswers);
+    };
+
+    const handleSubmit = () => {
+        onSubmitAll(answers, setIncorrectQuestions);
+    };
+
+    const renderTables = (tables) => {
+        return Object.entries(tables).map(([tableName, tableData]) => {
+            if (!tableData || tableData.length === 0) return null;
+
+            return (
+                <div key={tableName} style={{
+                    background: 'var(--bg-secondary)',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                    marginBottom: '1rem'
+                }}>
+                    <h4 style={{
+                        color: 'var(--accent-secondary)',
+                        marginBottom: '0.75rem',
+                        fontFamily: 'var(--font-code)',
+                        fontSize: '0.9rem'
+                    }}>
+                        TABLE: {tableName.toUpperCase()}
+                    </h4>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            fontSize: '0.8rem',
+                            fontFamily: 'var(--font-code)'
+                        }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid var(--accent-primary)', textAlign: 'left' }}>
+                                    {Object.keys(tableData[0]).map(key => (
+                                        <th key={key} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}>
+                                            {key.toUpperCase()}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tableData.map((row, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        {Object.values(row).map((val, j) => (
+                                            <td key={j} style={{ padding: '0.5rem' }}>{val}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        });
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Info Banner */}
+            <div style={{
+                background: 'rgba(0, 255, 204, 0.05)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--accent-secondary)',
+                textAlign: 'center'
+            }}>
+                <p style={{ color: 'var(--accent-secondary)', fontSize: '0.95rem' }}>
+                    {levelData.subtitle}
+                </p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                    ⏱ No time limit • 📊 Tables always visible • ✅ All corrections must be correct
+                </p>
+            </div>
+
+            {/* Tables Section */}
+            <div>
+                <h3 style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>📊 Reference Tables</h3>
+                {renderTables(levelData.tables)}
+            </div>
+
+            {/* Questions */}
+            {levelData.questions.map((q, idx) => (
+                <div
+                    key={q.id}
+                    style={{
+                        background: incorrectQuestions.includes(q.id)
+                            ? 'rgba(255, 51, 51, 0.05)'
+                            : 'var(--bg-secondary)',
+                        padding: '1.5rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: incorrectQuestions.includes(q.id)
+                            ? '2px solid var(--accent-error)'
+                            : '1px solid var(--border-subtle)'
+                    }}
+                >
+                    <h3 style={{
+                        color: 'var(--accent-primary)',
+                        marginBottom: '1rem',
+                        fontSize: '1.1rem'
+                    }}>
+                        {q.title}
+                    </h3>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <p style={{
+                            fontSize: '0.85rem',
+                            color: 'var(--text-muted)',
+                            marginBottom: '0.5rem',
+                            fontWeight: 'bold'
+                        }}>
+                            BROKEN QUERY:
+                        </p>
+                        <pre style={{
+                            background: 'rgba(255, 51, 51, 0.1)',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '0.85rem',
+                            fontFamily: 'var(--font-code)',
+                            color: 'var(--accent-error)',
+                            overflowX: 'auto',
+                            border: '1px solid var(--accent-error)'
+                        }}>
+                            {q.brokenQuery}
+                        </pre>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>{q.task}</p>
+                        <p style={{
+                            fontSize: '0.85rem',
+                            color: 'var(--text-muted)',
+                            fontStyle: 'italic'
+                        }}>
+                            HINT: {q.hint}
+                        </p>
+                    </div>
+
+                    <input
+                        type="text"
+                        value={answers[idx]}
+                        onChange={(e) => handleAnswerChange(idx, e.target.value)}
+                        placeholder="Enter your correction..."
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            background: 'var(--bg-primary)',
+                            border: incorrectQuestions.includes(q.id)
+                                ? '1px solid var(--accent-error)'
+                                : '1px solid var(--accent-primary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '1rem',
+                            outline: 'none',
+                            borderRadius: 'var(--radius-sm)',
+                            fontFamily: 'var(--font-code)'
+                        }}
+                    />
+                </div>
+            ))}
+
+            {/* Submit Button */}
+            <button
+                onClick={handleSubmit}
+                className="btn btn-primary"
+                style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
+                disabled={answers.some(a => !a.trim())}
+            >
+                SUBMIT ALL CORRECTIONS
+            </button>
+        </div>
+    );
+};
+
 const GameScreen = () => {
     const { state, submitAnswer, error } = useGame();
     const [input, setInput] = useState('');
@@ -476,6 +879,22 @@ const GameScreen = () => {
     };
 
     const handleRound4Submit = async (answers, setIncorrectQuestions) => {
+        const result = await submitAnswer(JSON.stringify(answers));
+        if (!result.success && result.incorrectQuestions) {
+            setIncorrectQuestions(result.incorrectQuestions);
+            setShowRetry(true);
+        }
+    };
+
+    const handleQueryMatching = async (mapping, setIncorrectQueries) => {
+        const result = await submitAnswer(JSON.stringify(mapping));
+        if (!result.success && result.incorrectQueries) {
+            setIncorrectQueries(result.incorrectQueries);
+            setShowRetry(true);
+        }
+    };
+
+    const handleQueryFixing = async (answers, setIncorrectQuestions) => {
         const result = await submitAnswer(JSON.stringify(answers));
         if (!result.success && result.incorrectQuestions) {
             setIncorrectQuestions(result.incorrectQuestions);
@@ -591,6 +1010,14 @@ const GameScreen = () => {
                     </div>
                 </div>
             );
+        }
+
+        if (levelData.type === 'QUERY_MATCHING') {
+            return <QueryMatchingComponent levelData={levelData} onSubmit={handleQueryMatching} />;
+        }
+
+        if (levelData.type === 'QUERY_FIXING') {
+            return <QueryFixingComponent levelData={levelData} onSubmitAll={handleQueryFixing} />;
         }
 
         if (levelData.type === 'SQL_REASONING_MULTI') {

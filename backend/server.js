@@ -25,10 +25,21 @@ const pool = mysql.createPool({
 
 // Email Transporter (using nodemailer)
 const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: process.env.SMTP_SERVER || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false, // true for 465, false for other ports
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
+        user: process.env.SMTP_USERNAME,
+        pass: process.env.SMTP_PASSWORD
+    }
+});
+
+// Test email connection on startup
+transporter.verify(function (error, success) {
+    if (error) {
+        console.error('❌ Email configuration error:', error);
+    } else {
+        console.log('✅ Email server is ready to send messages');
     }
 });
 
@@ -37,15 +48,18 @@ const transporter = nodemailer.createTransport({
 // Team Login
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { teamId, accessCode } = req.body;
+        const { teamName, loginCode } = req.body;
 
         const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE team_id = ? AND access_code = ? AND is_active = TRUE',
-            [teamId, accessCode]
+            'SELECT * FROM teams WHERE team_name = ? AND login_code = ? AND is_active = TRUE',
+            [teamName, loginCode]
         );
 
         if (teams.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid team name or login code'
+            });
         }
 
         const team = teams[0];
@@ -62,7 +76,10 @@ app.post('/api/auth/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({
+            success: false,
+            error: 'Server error'
+        });
     }
 });
 
@@ -183,8 +200,8 @@ app.post('/api/game/submit', async (req, res) => {
                 [teamId, round, stage]
             );
 
-            // Round 4 Special: Send email with advantage code
-            if (round === 4 && stage === 1 && result.triggerEmail) {
+            // Round 4 Phase 2: Send email with advantage code
+            if (round === 4 && stage === 2 && result.triggerEmail) {
                 const code = `INT26-R4-${Math.floor(1000 + Math.random() * 9000)}`;
 
                 // Store code in database
@@ -197,6 +214,7 @@ app.post('/api/game/submit', async (req, res) => {
                 await sendAdvantageCodeEmail(team.email, team.team_name, code);
 
                 result.emailSent = true;
+                result.code = code; // For testing/debugging
             }
         }
 
@@ -298,35 +316,152 @@ app.post('/api/admin/override', async (req, res) => {
     }
 });
 
+// Create Team (Admin)
+app.post('/api/admin/create-team', async (req, res) => {
+    try {
+        const { teamName, email, loginCode } = req.body;
+
+        // Generate team ID
+        const teamId = `TM-${Date.now().toString().slice(-6)}`;
+        const accessCode = `ACC-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // Check if team name or email already exists
+        const [existing] = await pool.query(
+            'SELECT team_id FROM teams WHERE team_name = ? OR email = ?',
+            [teamName, email]
+        );
+
+        if (existing.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Team name or email already exists'
+            });
+        }
+
+        // Insert team
+        await pool.query(
+            'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES (?, ?, ?, ?, ?)',
+            [teamId, teamName, email, loginCode, accessCode]
+        );
+
+        // Generate physical codes for Round 1 and Round 3
+        const round1Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+        const round3Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        await pool.query(
+            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 1, ?), (?, 3, ?)',
+            [teamId, round1Code, teamId, round3Code]
+        );
+
+        // Send credentials email
+        await sendTeamCredentialsEmail(email, teamName, loginCode);
+
+        res.json({
+            success: true,
+            message: 'Team created successfully',
+            teamId,
+            loginCode
+        });
+    } catch (error) {
+        console.error('Create team error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error'
+        });
+    }
+});
+
+// Resend Credentials (Admin)
+app.post('/api/admin/resend-credentials', async (req, res) => {
+    try {
+        const { teamId } = req.body;
+
+        const [teams] = await pool.query(
+            'SELECT * FROM teams WHERE team_id = ?',
+            [teamId]
+        );
+
+        if (teams.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Team not found'
+            });
+        }
+
+        const team = teams[0];
+        await sendTeamCredentialsEmail(team.email, team.team_name, team.login_code);
+
+        res.json({
+            success: true,
+            message: 'Credentials resent successfully'
+        });
+    } catch (error) {
+        console.error('Resend credentials error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error'
+        });
+    }
+});
+
+// Toggle Team Active Status (Admin)
+app.post('/api/admin/toggle-team', async (req, res) => {
+    try {
+        const { teamId, isActive } = req.body;
+
+        await pool.query(
+            'UPDATE teams SET is_active = ? WHERE team_id = ?',
+            [isActive, teamId]
+        );
+
+        res.json({
+            success: true,
+            message: `Team ${isActive ? 'activated' : 'deactivated'} successfully`
+        });
+    } catch (error) {
+        console.error('Toggle team error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error'
+        });
+    }
+});
+
 // ==================== EMAIL FUNCTIONS ====================
 
 async function sendWelcomeEmail(email, teamName, teamId, accessCode) {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
         to: email,
-        subject: 'Welcome to CODECRYPT - Intellect \'26',
+        subject: `Welcome to ${process.env.EVENT_NAME}`,
         html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #00ff41;">CODECRYPT - Intellect '26</h1>
-                <h2>Welcome, ${teamName}!</h2>
-                <p>Your team has been successfully registered for CODECRYPT.</p>
+            <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
+                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
+                <h2 style="text-align: center; color: #00ffcc;">Intellect '26</h2>
                 
-                <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
-                    <h3>Your Credentials:</h3>
-                    <p><strong>Team ID:</strong> ${teamId}</p>
-                    <p><strong>Access Code:</strong> ${accessCode}</p>
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
+                    <h3 style="color: #00ffcc;">Welcome, ${teamName}!</h3>
+                    <p>Your team has been successfully registered for CODECRYPT.</p>
                 </div>
                 
-                <p><strong>Event Details:</strong></p>
-                <ul>
-                    <li>Date: [EVENT_DATE]</li>
-                    <li>Venue: [VENUE]</li>
-                    <li>Platform: <a href="http://localhost:5173">http://localhost:5173</a></li>
-                </ul>
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border: 1px solid #00ff41;">
+                    <h3 style="color: #00ffcc;">🔐 Your Credentials:</h3>
+                    <p><strong>Team ID:</strong> <code style="background: #0a0a0a; padding: 5px; color: #00ff41;">${teamId}</code></p>
+                    <p><strong>Access Code:</strong> <code style="background: #0a0a0a; padding: 5px; color: #00ff41;">${accessCode}</code></p>
+                </div>
                 
-                <p>Keep your credentials safe. You'll need them to login on the event day.</p>
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #00ffcc;">📅 Event Details:</h3>
+                    <ul>
+                        <li>Date: ${process.env.EVENT_DATE}</li>
+                        <li>Venue: ${process.env.VENUE}</li>
+                        <li>Platform: <a href="${process.env.FRONTEND_URL}" style="color: #00ffcc;">${process.env.FRONTEND_URL}</a></li>
+                    </ul>
+                </div>
                 
-                <p style="color: #666; font-size: 12px; margin-top: 30px;">
+                <p style="text-align: center; margin-top: 30px;">⚠️ Keep your credentials safe. You'll need them to login on the event day.</p>
+                
+                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
                     This is an automated email. Please do not reply.
                 </p>
             </div>
@@ -335,9 +470,148 @@ async function sendWelcomeEmail(email, teamName, teamId, accessCode) {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`Welcome email sent to ${email}`);
+        console.log(`✅ Welcome email sent to ${email}`);
     } catch (error) {
-        console.error('Email error:', error);
+        console.error('❌ Email error:', error);
+    }
+}
+
+async function sendAdvantageCodeEmail(email, teamName, code) {
+    const mailOptions = {
+        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
+        to: email,
+        subject: `🎯 ADVANTAGE CODE - Round 4 Complete!`,
+        html: `
+            <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
+                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
+                <h2 style="text-align: center; color: #00ffcc;">🎯 ADVANTAGE ROUND COMPLETE</h2>
+                
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
+                    <h3 style="color: #00ffcc;">Congratulations, ${teamName}!</h3>
+                    <p>You have successfully completed both phases of Round 4: SQL Advantage Round.</p>
+                    <p style="margin-top: 15px;">✅ Phase 1: Match the Logic - COMPLETE</p>
+                    <p>✅ Phase 2: Fix the System - COMPLETE</p>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%); padding: 30px; margin: 20px 0; border: 2px solid #00ff41; text-align: center;">
+                    <h3 style="color: #00ffcc; margin-bottom: 15px;">🔑 YOUR ADVANTAGE CODE</h3>
+                    <div style="background: #0a0a0a; padding: 20px; margin: 15px 0; border: 1px dashed #00ff41;">
+                        <p style="font-size: 32px; font-weight: bold; color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px #00ff41; margin: 0;">
+                            ${code}
+                        </p>
+                    </div>
+                    <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock the Final Round</p>
+                </div>
+                
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #00ffcc;">📍 Backup Location:</h3>
+                    <p>If you didn't receive this email, visit: <strong style="color: #00ff41;">ADMIN DESK</strong></p>
+                    <p style="font-size: 12px; color: #999; margin-top: 10px;">Show this email or your Team ID to get your code.</p>
+                </div>
+                
+                <div style="background: rgba(255, 204, 0, 0.1); padding: 15px; margin: 20px 0; border-left: 4px solid #ffcc00;">
+                    <p style="color: #ffcc00; margin: 0;"><strong>⏰ Next Steps:</strong></p>
+                    <ol style="color: #ffcc00; margin: 10px 0;">
+                        <li>Return to the game platform</li>
+                        <li>Enter your advantage code</li>
+                        <li>Prepare for the Final Round</li>
+                    </ol>
+                </div>
+                
+                <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #00ffcc;">
+                    🚀 Good luck in the Final Round!
+                </p>
+                
+                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                    This is an automated email from ${process.env.EVENT_NAME}<br>
+                    Please do not reply to this message.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Advantage code email sent to ${email} with code: ${code}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Email error:', error);
+        return false;
+    }
+}
+
+async function sendTeamCredentialsEmail(email, teamName, loginCode) {
+    const mailOptions = {
+        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
+        to: email,
+        subject: `🎮 Your CODECRYPT Login Credentials`,
+        html: `
+            <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
+                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
+                <h2 style="text-align: center; color: #00ffcc;">🎮 TEAM CREDENTIALS</h2>
+                
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
+                    <h3 style="color: #00ffcc;">Welcome to CODECRYPT, ${teamName}!</h3>
+                    <p>Your team has been registered for the event. Use the credentials below to login.</p>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%); padding: 30px; margin: 20px 0; border: 2px solid #00ff41; text-align: center;">
+                    <h3 style="color: #00ffcc; margin-bottom: 15px;">🔐 YOUR LOGIN CREDENTIALS</h3>
+                    
+                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
+                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">TEAM NAME</p>
+                        <p style="font-size: 24px; font-weight: bold; color: #00ff41; letter-spacing: 2px; margin: 5px 0;">
+                            ${teamName}
+                        </p>
+                    </div>
+                    
+                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
+                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">LOGIN CODE</p>
+                        <p style="font-size: 28px; font-weight: bold; color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px #00ff41; margin: 5px 0;">
+                            ${loginCode}
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #00ffcc;">📅 Event Details:</h3>
+                    <ul style="line-height: 1.8;">
+                        <li>Event: ${process.env.EVENT_NAME}</li>
+                        <li>Date: ${process.env.EVENT_DATE}</li>
+                        <li>Venue: ${process.env.VENUE}</li>
+                        <li>Platform: <a href="${process.env.FRONTEND_URL}" style="color: #00ffcc;">${process.env.FRONTEND_URL}</a></li>
+                    </ul>
+                </div>
+                
+                <div style="background: rgba(255, 204, 0, 0.1); padding: 15px; margin: 20px 0; border-left: 4px solid #ffcc00;">
+                    <p style="color: #ffcc00; margin: 0;"><strong>⚠️ IMPORTANT:</strong></p>
+                    <ul style="color: #ffcc00; margin: 10px 0; line-height: 1.6;">
+                        <li>Keep these credentials safe and confidential</li>
+                        <li>You will need both Team Name and Login Code to access the system</li>
+                        <li>Rounds unlock automatically after completion</li>
+                        <li>Your score is based on correctness and speed</li>
+                    </ul>
+                </div>
+                
+                <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #00ffcc;">
+                    🚀 See you at the event!
+                </p>
+                
+                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                    This is an automated email from ${process.env.EVENT_NAME}<br>
+                    If you have any questions, contact the admin desk.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Team credentials email sent to ${email} for team: ${teamName}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Email error:', error);
+        return false;
     }
 }
 

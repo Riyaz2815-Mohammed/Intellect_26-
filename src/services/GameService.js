@@ -1,7 +1,15 @@
 import { normalizeSQL, SQL_CHALLENGES, ROUND1_CODE, ROUND1_PLACE } from '../data/round1';
 import { COLLEGE_DATA, ROUND2_QUESTIONS, normalizeQuery, ROUND2_CODE, ROUND2_PLACE } from '../data/round2';
 import { ROUND3_QUESTIONS, ROUND3_CODE, ROUND3_PLACE } from '../data/round3';
-import { ROUND4_QUESTIONS, validateAllAnswers, ROUND4_PLACE } from '../data/round4';
+import {
+    ROUND4_TABLES,
+    PHASE1_QUERIES,
+    PHASE1_OUTPUTS,
+    validatePhase1Matching,
+    PHASE2_QUESTIONS,
+    validatePhase2Answers,
+    ROUND4_PLACE
+} from '../data/round4';
 
 // Simulated Backend Service
 export const GameService = {
@@ -109,11 +117,37 @@ export const GameService = {
             }
         }
 
-        // Round 4 Logic: SQL Reasoning (Calm Advantage Round)
+        // Round 4 Logic: SQL Advantage Round (2 Phases)
         if (round === 4) {
-            // Stage 1: All 5 questions answered together
+            // Phase 1: Match the Logic (Query to Output Matching)
             if (stage === 1) {
-                // Input should be an array of 5 answers or JSON string
+                // Input should be an object mapping queries to outputs: { Q1: 'O1', Q2: 'O2', ... }
+                let mapping;
+                try {
+                    mapping = typeof input === 'string' ? JSON.parse(input) : input;
+                } catch {
+                    return { success: false, message: 'Invalid mapping format' };
+                }
+
+                const result = validatePhase1Matching(mapping);
+                if (result.success) {
+                    return {
+                        success: true,
+                        points: result.points,
+                        message: result.message
+                    };
+                } else {
+                    return {
+                        success: false,
+                        message: result.message,
+                        incorrectQueries: result.incorrectQueries
+                    };
+                }
+            }
+
+            // Phase 2: Fix the System (Broken Query Debugging)
+            if (stage === 2) {
+                // Input should be an array of 5 answers
                 let answers;
                 try {
                     answers = typeof input === 'string' ? JSON.parse(input) : input;
@@ -121,7 +155,7 @@ export const GameService = {
                     return { success: false, message: 'Invalid answer format' };
                 }
 
-                const result = validateAllAnswers(answers);
+                const result = validatePhase2Answers(answers);
                 if (result.success) {
                     return {
                         success: true,
@@ -138,8 +172,8 @@ export const GameService = {
                 }
             }
 
-            // Stage 2: Email code entry
-            if (stage === 2) {
+            // Stage 3: Email code entry
+            if (stage === 3) {
                 // In real implementation, validate against database
                 // For now, accept any code starting with INT26-R4-
                 const codePattern = /^INT26-R4-\d{4}$/i;
@@ -260,17 +294,35 @@ export const GameService = {
         }
 
         if (round === 4) {
+            // Phase 1: Match the Logic
             if (stage === 1) {
                 return {
-                    type: 'SQL_REASONING_MULTI',
-                    title: 'ADVANTAGE ROUND - SQL REASONING',
-                    subtitle: 'Answer all 5 questions correctly to receive your advantage code via email',
-                    questions: ROUND4_QUESTIONS,
-                    placeholder: 'Enter your answer...',
+                    type: 'QUERY_MATCHING',
+                    title: 'ADVANTAGE ROUND - PHASE 1: MATCH THE LOGIC',
+                    subtitle: 'Match each SQL query to its correct output',
+                    queries: PHASE1_QUERIES,
+                    outputs: PHASE1_OUTPUTS,
+                    tables: ROUND4_TABLES,
+                    placeholder: 'Drag or select outputs...',
+                    hint: 'Take your time. No time limit. All tables are visible.'
+                };
+            }
+
+            // Phase 2: Fix the System
+            if (stage === 2) {
+                return {
+                    type: 'QUERY_FIXING',
+                    title: 'ADVANTAGE ROUND - PHASE 2: FIX THE SYSTEM',
+                    subtitle: 'Identify and correct the mistakes in these broken queries',
+                    questions: PHASE2_QUESTIONS,
+                    tables: ROUND4_TABLES,
+                    placeholder: 'Enter your correction...',
                     hint: 'Take your time. No time limit.'
                 };
             }
-            if (stage === 2) {
+
+            // Stage 3: Email code entry
+            if (stage === 3) {
                 return {
                     type: 'EMAIL_CODE_ENTRY',
                     title: 'ADVANTAGE CODE VERIFICATION',
@@ -280,7 +332,9 @@ export const GameService = {
                     placeholder: 'Enter code from email...'
                 };
             }
-            if (stage === 3) {
+
+            // Stage 4: Round complete
+            if (stage === 4) {
                 return {
                     type: 'ROUND_COMPLETE',
                     title: 'ADVANTAGE SECURED',

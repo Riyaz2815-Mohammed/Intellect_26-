@@ -1,0 +1,136 @@
+import React, { useState } from 'react';
+import './LoginScreen.css';
+
+const LoginScreen = ({ onLogin }) => {
+    const [teamName, setTeamName] = useState('');
+    const [loginCode, setLoginCode] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        try {
+            const response = await fetch('http://localhost:3001/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    teamName: teamName.trim(),
+                    loginCode: loginCode.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Store team info in localStorage
+                localStorage.setItem('teamId', data.team.id);
+                localStorage.setItem('teamName', data.team.name);
+                localStorage.setItem('teamEmail', data.team.email);
+
+                // Call parent onLogin
+                onLogin(data.team);
+            } else {
+                setError(data.error || 'Invalid credentials');
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            setError('Connection error. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const navigateToAdmin = () => {
+        window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'admin' } }));
+    };
+
+    return (
+        <div className="login-container">
+            <div className="login-background">
+                <div className="matrix-rain"></div>
+            </div>
+
+            <div className="login-card">
+                <div className="login-header">
+                    <h1 className="login-title">CODECRYPT</h1>
+                    <p className="login-subtitle">// INTELLECT '26</p>
+                    <div className="login-divider"></div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="login-form">
+                    <div className="form-group">
+                        <label htmlFor="teamName">TEAM NAME</label>
+                        <input
+                            id="teamName"
+                            type="text"
+                            value={teamName}
+                            onChange={(e) => setTeamName(e.target.value)}
+                            placeholder="Enter your team name..."
+                            required
+                            autoComplete="off"
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="loginCode">LOGIN CODE</label>
+                        <input
+                            id="loginCode"
+                            type="text"
+                            value={loginCode}
+                            onChange={(e) => setLoginCode(e.target.value)}
+                            placeholder="Enter your login code..."
+                            required
+                            autoComplete="off"
+                            disabled={loading}
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="error-message">
+                            <span className="error-icon">⚠</span>
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        className="login-button"
+                        disabled={loading || !teamName.trim() || !loginCode.trim()}
+                    >
+                        {loading ? (
+                            <>
+                                <span className="spinner"></span>
+                                AUTHENTICATING...
+                            </>
+                        ) : (
+                            <>
+                                <span className="lock-icon">🔓</span>
+                                ACCESS SYSTEM
+                            </>
+                        )}
+                    </button>
+                </form>
+
+                <div className="login-footer">
+                    <p className="footer-text">
+                        Don't have credentials? Contact the admin desk.
+                    </p>
+                    <button
+                        className="admin-link"
+                        onClick={navigateToAdmin}
+                    >
+                        Admin Panel →
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default LoginScreen;
