@@ -28,6 +28,11 @@ const FlashChallengeContent = ({ levelData }) => {
 
     const renderFlashData = () => {
         if (levelData.subType === 'TABLE_FLASH') {
+            // Safety check: ensure flashData exists and is an array
+            if (!levelData.flashData || !Array.isArray(levelData.flashData) || levelData.flashData.length === 0) {
+                return <div style={{ color: 'var(--accent-error)', padding: '1rem' }}>ERROR: No table data available</div>;
+            }
+
             return (
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', fontFamily: 'var(--font-code)' }}>
@@ -68,6 +73,34 @@ const FlashChallengeContent = ({ levelData }) => {
             );
         }
 
+        if (levelData.subType === 'LOGICAL_DECISION') {
+            // For logical decision, show the table data if available
+            if (levelData.flashData && Array.isArray(levelData.flashData) && levelData.flashData.length > 0) {
+                return (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', fontFamily: 'var(--font-code)' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid var(--accent-primary)', textAlign: 'left' }}>
+                                    {Object.keys(levelData.flashData[0]).map(key => (
+                                        <th key={key} style={{ padding: '0.75rem', color: 'var(--accent-secondary)' }}>{key.toUpperCase()}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {levelData.flashData.map((row, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        {Object.values(row).map((val, j) => (
+                                            <td key={j} style={{ padding: '0.75rem' }}>{val}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            }
+        }
+
         return null;
     };
 
@@ -105,6 +138,114 @@ const FlashChallengeContent = ({ levelData }) => {
                     </p>
                 </div>
             )}
+        </div>
+    );
+};
+
+// Table Query Flash Component - Table stays visible, query flashes
+const TableQueryFlashContent = ({ levelData }) => {
+    const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
+    const [isQueryLocked, setIsQueryLocked] = useState(false);
+
+    useEffect(() => {
+        setFlashTimeLeft(levelData.flashDuration);
+        setIsQueryLocked(false);
+    }, [levelData]);
+
+    useEffect(() => {
+        if (flashTimeLeft <= 0) {
+            setIsQueryLocked(true);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setFlashTimeLeft(prev => prev - 1);
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [flashTimeLeft]);
+
+    const renderTable = (tableData) => {
+        if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
+            return <div style={{ color: 'var(--accent-error)', padding: '1rem' }}>ERROR: No table data available</div>;
+        }
+
+        return (
+            <div style={{ overflowX: 'auto', marginTop: '1.5rem' }}>
+                <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '0.75rem', fontFamily: 'var(--font-code)' }}>
+                    EVENTS TABLE (Reference)
+                </h4>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', fontFamily: 'var(--font-code)' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '2px solid var(--accent-primary)', textAlign: 'left' }}>
+                            {Object.keys(tableData[0]).map(key => (
+                                <th key={key} style={{ padding: '0.75rem', color: 'var(--accent-secondary)' }}>{key.toUpperCase()}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tableData.map((row, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                {Object.values(row).map((val, j) => (
+                                    <td key={j} style={{ padding: '0.75rem' }}>{val}</td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    return (
+        <div>
+            {/* Query Flash Section */}
+            {!isQueryLocked ? (
+                <div className="animate-fade-in">
+                    <div style={{
+                        background: 'rgba(255, 204, 0, 0.1)',
+                        border: '2px solid var(--accent-warning)',
+                        padding: '1rem',
+                        marginBottom: '1.5rem',
+                        textAlign: 'center',
+                        fontSize: '2rem',
+                        fontFamily: 'var(--font-code)',
+                        color: 'var(--accent-warning)',
+                        fontWeight: 'bold'
+                    }}>
+                        MEMORIZE QUERY: {flashTimeLeft}s
+                    </div>
+                    <pre style={{
+                        background: 'var(--bg-tertiary)',
+                        padding: '1.5rem',
+                        borderRadius: 'var(--radius-md)',
+                        fontFamily: 'var(--font-code)',
+                        fontSize: '1.1rem',
+                        border: '2px solid var(--accent-primary)',
+                        whiteSpace: 'pre-wrap',
+                        marginBottom: '1.5rem'
+                    }}>
+                        {levelData.flashData}
+                    </pre>
+                </div>
+            ) : (
+                <div style={{
+                    background: 'rgba(255, 51, 51, 0.1)',
+                    border: '2px solid var(--accent-error)',
+                    padding: '1.5rem',
+                    marginBottom: '1.5rem',
+                    borderRadius: 'var(--radius-md)'
+                }}>
+                    <h3 style={{ color: 'var(--accent-error)', marginBottom: '0.5rem' }}>🔒 QUERY LOCKED</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{levelData.prompt}</p>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                        HINT: {levelData.hint}
+                    </p>
+                </div>
+            )}
+
+            {/* Table Always Visible */}
+            {renderTable(levelData.tableData)}
         </div>
     );
 };
@@ -377,6 +518,10 @@ const GameScreen = () => {
 
         if (levelData.type === 'FLASH_CHALLENGE') {
             return <FlashChallengeContent levelData={levelData} />;
+        }
+
+        if (levelData.type === 'TABLE_QUERY_FLASH') {
+            return <TableQueryFlashContent levelData={levelData} />;
         }
 
         if (levelData.type === 'DATA_ANALYSIS') {

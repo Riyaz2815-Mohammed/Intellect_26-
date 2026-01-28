@@ -62,25 +62,29 @@ export const ROUND3_QUESTIONS = [
         type: 'LOGICAL_DECISION',
         flashDuration: 15,
         flashData: EVENTS_TABLE,
-        prompt: "Impact Assessment: 'HackRush' has entered CRITICAL status. Analyze the table to determine the CORRELATION: As 'User Count' increases, what specific metric degrades most severely?",
+        hint: "Give the reason in simple words",
+        prompt: "Why did LogicLoop event has a status warning?",
         validateFn: (input) => {
             const normalized = input.toLowerCase().trim();
-            return normalized.includes('error') || normalized.includes('rate');
+            return normalized.includes('error') || normalized.includes('rate') || normalized.includes('high') || normalized.includes('4.5') || normalized.includes('4.5%') || normalized.includes('users');
         },
-        answer: "Error Rate (Increases with users)"
+        answer: "LogicLoop - High Error Rate" || "High Cpu load" || "High users"
     },
     {
         id: 5,
-        type: 'QUERY_FLASH',
+        type: 'TABLE_QUERY_FLASH',
         flashDuration: 15,
-        flashData: CONFIG_FLASH,
-        prompt: "Config Restoration: Re-type the JSON configuration string EXACTLY.",
-        hint: "Mind the quotes and brackets",
+        flashData: 'SELECT name FROM events WHERE (status = "CRITICAL" OR status = "CRASHED") AND cpu_load > 75 and users < 300 ',
+        tableData: EVENTS_TABLE,
+        prompt: "Execute the query mentally and provide the result (event names in correct order).",
+        hint: "The query was shown for 15 seconds. Apply it to the table below.",
         validateFn: (input) => {
-            // Strict check for JSON structure
-            return input.trim() === CONFIG_FLASH.trim();
+            const normalized = input.toLowerCase().trim();
+            const hasHackRush = normalized.includes('hackrush');
+            const hackRushIndex = normalized.indexOf('hackrush');
+            return hasHackRush && hackRushIndex < 10;
         },
-        answer: CONFIG_FLASH
+        answer: "HackRush"
     }
 ];
 

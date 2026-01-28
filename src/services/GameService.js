@@ -221,10 +221,26 @@ export const GameService = {
         if (round === 3) {
             if (stage <= 5) {
                 const question = ROUND3_QUESTIONS[stage - 1];
+
+                // Handle TABLE_QUERY_FLASH type differently
+                if (question.type === 'TABLE_QUERY_FLASH') {
+                    return {
+                        type: 'TABLE_QUERY_FLASH',
+                        title: `PRESSURE TEST [${stage}/5]`,
+                        prompt: question.prompt,
+                        hint: question.hint,
+                        flashDuration: question.flashDuration || 0,
+                        flashData: question.flashData, // The SQL query
+                        tableData: question.tableData, // The events table
+                        placeholder: 'Enter the query result...'
+                    };
+                }
+
+                // Handle other flash challenge types
                 return {
                     type: 'FLASH_CHALLENGE',
                     subType: question.type,
-                    title: `PRESSURE TEST [${stage}/3]`,
+                    title: `PRESSURE TEST [${stage}/5]`,
                     prompt: question.prompt,
                     hint: question.hint,
                     flashDuration: question.flashDuration || 0,
@@ -239,15 +255,6 @@ export const GameService = {
                     content: 'ONE TEAM MEMBER MUST RETRIEVE CODE',
                     hint: 'Go to location immediately',
                     location: ROUND3_PLACE
-                };
-            }
-            if (stage === 5) {
-                return {
-                    type: 'ROUND_COMPLETE',
-                    title: 'ROUND 3 COMPLETE',
-                    content: 'ALL SYSTEMS OPERATIONAL. FINAL ROUND AWAITS...',
-                    hint: 'Prepare for the ultimate challenge.',
-                    placeholder: 'SYSTEM LOCKED'
                 };
             }
         }
