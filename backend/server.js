@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// MySQL Connection Pool
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
@@ -22,6 +21,22 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+// Test database connection on startup
+(async () => {
+    try {
+        const connection = await pool.getConnection();
+        console.log('✅ MySQL Database connected successfully');
+        connection.release();
+    } catch (error) {
+        console.error('❌ Database connection error:', error.message);
+        if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+            console.error('👉 Tip: Check your DB_PASSWORD in backend/.env');
+        } else if (error.code === 'ER_BAD_DB_ERROR') {
+            console.error('👉 Tip: Database "codecrypt" does not exist. Run Round 1 logic or schema.sql');
+        }
+    }
+})();
 
 // Email Transporter (using nodemailer)
 const transporter = nodemailer.createTransport({
@@ -174,30 +189,77 @@ app.post('/api/game/submit', async (req, res) => {
 
         const team = teams[0];
 
-        // Validate answer (import your GameService logic here)
+        // Calculate Time Taken
+        let timeTaken = 0;
+        let timeBonus = 0;
+
+        // Get start time for this stage
+        const [progress] = await pool.query(
+            'SELECT started_at FROM team_progress WHERE team_id = ? AND round = ? AND stage = ?',
+            [teamId, round, stage]
+        );
+
+        if (progress.length > 0 && progress[0].started_at) {
+            const startTime = new Date(progress[0].started_at);
+            const endTime = new Date();
+            timeTaken = Math.floor((endTime - startTime) / 1000); // Seconds
+
+            // Calculate Bonus (Example: Max 600s, Bonus = remaining * 0.5)
+            const TIME_LIMIT = 600; // 10 minutes generic limit
+            if (timeTaken < TIME_LIMIT) {
+                timeBonus = Math.floor((TIME_LIMIT - timeTaken) * 0.2); // 0.2 points per second saved
+            }
+        } else {
+            // First stage or missing record - Create 'in_progress' record now if missing to start timer for re-attempts
+            await pool.query(
+                'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
+                [teamId, round, stage]
+            );
+        }
+
+        // Validate answer
         const GameService = require('./gameService');
         const result = GameService.validateSubmission(round, stage, answer);
 
+        // Calculate Total Points for this submission
+        const pointsAwarded = result.success ? (result.points || 0) : 0;
+        const totalPointsAwarded = pointsAwarded + (result.success ? timeBonus : 0);
+
         // Log submission
         await pool.query(
-            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, error_message) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [teamId, round, stage, answer, result.success, result.points || 0, result.message]
+            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, time_bonus, time_taken_seconds, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [teamId, round, stage, JSON.stringify(answer), result.success, pointsAwarded, timeBonus, timeTaken, result.message]
         );
 
         if (result.success) {
             // Update team progress
-            const newScore = team.total_score + (result.points || 0);
-            const nextStage = stage + 1;
+            const newScore = team.total_score + totalPointsAwarded;
+
+            // Round Transition Logic
+            const STAGES_PER_ROUND = { 1: 4, 2: 2, 3: 6, 4: 3 };
+            let nextRound = round;
+            let nextStage = stage + 1;
+
+            if (nextStage > (STAGES_PER_ROUND[round] || 5)) {
+                nextRound = round + 1;
+                nextStage = 1;
+            }
 
             await pool.query(
-                'UPDATE teams SET total_score = ?, current_stage = ? WHERE team_id = ?',
-                [newScore, nextStage, teamId]
+                'UPDATE teams SET total_score = ?, current_round = ?, current_stage = ? WHERE team_id = ?',
+                [newScore, nextRound, nextStage, teamId]
             );
 
-            // Mark stage as completed
+            // Mark current stage as completed
             await pool.query(
-                'INSERT INTO team_progress (team_id, round, stage, status, completed_at) VALUES (?, ?, ?, \'completed\', NOW()) ON DUPLICATE KEY UPDATE status = \'completed\', completed_at = NOW()',
-                [teamId, round, stage]
+                'UPDATE team_progress SET status = "completed", completed_at = NOW(), time_taken_seconds = ? WHERE team_id = ? AND round = ? AND stage = ?',
+                [timeTaken, teamId, round, stage]
+            );
+
+            // Initialize NEXT stage (to start timer)
+            await pool.query(
+                'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
+                [teamId, nextRound, nextStage]
             );
 
             // Round 4 Phase 2: Send email with advantage code
@@ -218,7 +280,12 @@ app.post('/api/game/submit', async (req, res) => {
             }
         }
 
-        res.json(result);
+        res.json({
+            ...result,
+            timeTaken,
+            timeBonus: result.success ? timeBonus : 0,
+            totalPoints: totalPointsAwarded
+        });
     } catch (error) {
         console.error('Submit error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -299,6 +366,23 @@ app.get('/api/admin/teams', async (req, res) => {
     }
 });
 
+// Get All Submissions (Admin)
+app.get('/api/admin/submissions', async (req, res) => {
+    try {
+        const [submissions] = await pool.query(
+            `SELECT s.*, t.team_name 
+             FROM submissions s 
+             JOIN teams t ON s.team_id = t.team_id 
+             ORDER BY s.submitted_at DESC 
+             LIMIT 100`
+        );
+        res.json(submissions);
+    } catch (error) {
+        console.error('Submissions error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Admin Override Team State
 app.post('/api/admin/override', async (req, res) => {
     try {
@@ -342,6 +426,12 @@ app.post('/api/admin/create-team', async (req, res) => {
         await pool.query(
             'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES (?, ?, ?, ?, ?)',
             [teamId, teamName, email, loginCode, accessCode]
+        );
+
+        // Start tracking time for Round 1 Stage 1 immediately
+        await pool.query(
+            'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, 1, 1, "in_progress", NOW())',
+            [teamId]
         );
 
         // Generate physical codes for Round 1 and Round 3
