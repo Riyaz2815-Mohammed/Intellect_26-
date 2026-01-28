@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useGame } from '../context/GameContext';
 import './LoginScreen.css';
 
 const LoginScreen = ({ onLogin }) => {
+    const { login } = useGame();
     const [teamName, setTeamName] = useState('');
     const [loginCode, setLoginCode] = useState('');
     const [error, setError] = useState('');
@@ -42,6 +44,9 @@ const LoginScreen = ({ onLogin }) => {
                 localStorage.setItem('teamName', data.team.name);
                 localStorage.setItem('teamEmail', data.team.email);
                 localStorage.setItem('isAdmin', 'false');
+
+                // Update Context State
+                login(data.team.id, data.team.name, data.team.email);
 
                 // Call parent onLogin
                 onLogin(data.team);

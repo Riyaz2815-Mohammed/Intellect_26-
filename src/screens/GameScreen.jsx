@@ -825,28 +825,6 @@ const GameScreen = () => {
     const [levelData, setLevelData] = useState(null);
     const [showRetry, setShowRetry] = useState(false);
 
-    // Timer Logic
-    const [timeLeft, setTimeLeft] = useState(0);
-
-    useEffect(() => {
-        if (!state.roundEndsAt) return;
-
-        const interval = setInterval(() => {
-            const remaining = Math.max(0, Math.floor((state.roundEndsAt - Date.now()) / 1000));
-            setTimeLeft(remaining);
-            if (remaining === 0) {
-                clearInterval(interval);
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [state.roundEndsAt]);
-
-    const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
 
     // Initialize/Update Level Data
     useEffect(() => {
@@ -858,7 +836,6 @@ const GameScreen = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (state.roundEndsAt && timeLeft === 0) return;
 
         const result = await submitAnswer(input);
         if (!result.success) {
@@ -1073,18 +1050,10 @@ const GameScreen = () => {
         <div className="container" style={{ padding: '2rem 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem' }}>
                 <div>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '0.2rem' }}>{levelData.title}</h2>
-                    <div style={{ fontFamily: 'var(--font-code)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        ROUND {state.round} // PHASE {state.stage}
+                    <h1 style={{ marginBottom: '0.5rem' }}>{levelData.title.toUpperCase()}</h1>
+                    <div style={{ display: 'flex', gap: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem', fontFamily: 'var(--font-code)' }}>
+                        <span>ROUND {state.round} // PHASE {state.stage}</span>
                     </div>
-                </div>
-                <div style={{
-                    color: timeLeft < 60 ? 'var(--accent-error)' : 'var(--accent-warning)',
-                    fontWeight: 'bold',
-                    fontFamily: 'var(--font-code)',
-                    fontSize: '1.5rem'
-                }}>
-                    {state.roundEndsAt ? formatTime(timeLeft) : '∞'}
                 </div>
             </div>
 

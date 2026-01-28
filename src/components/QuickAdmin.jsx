@@ -103,7 +103,7 @@ const QuickAdmin = () => {
                         EXECUTE JUMP_
                     </button>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginTop: '5px' }}>
                         <button
                             onClick={() => adminOverride({ screen: 'LOBBY', teamId: 'ADMIN-TEST', teamName: 'DEBUG_MODE' })}
                             style={{ fontSize: '0.7rem', border: '1px solid #444', color: '#fff', padding: '5px', borderRadius: '4px', cursor: 'pointer' }}
@@ -114,7 +114,7 @@ const QuickAdmin = () => {
                             onClick={() => adminOverride({ round: 4, stage: 1, screen: 'GAME', teamId: 'ADMIN-TEST' })}
                             style={{ fontSize: '0.7rem', border: '1px solid #444', color: '#fff', padding: '5px', borderRadius: '4px', cursor: 'pointer' }}
                         >
-                            GO_TO_R4
+                            DEMO_R4
                         </button>
                     </div>
                 </div>

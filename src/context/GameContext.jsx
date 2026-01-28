@@ -17,16 +17,16 @@ const getRoundPath = (teamId) => {
 
 // Initial State
 const initialState = {
-    screen: 'WELCOME',
-    teamId: null,
-    teamName: null,
-    teamEmail: null,
+    screen: localStorage.getItem('teamId') ? 'LOBBY' : 'WELCOME',
+    teamId: localStorage.getItem('teamId') || null,
+    teamName: localStorage.getItem('teamName') || null,
+    teamEmail: localStorage.getItem('teamEmail') || null,
     round: 0,
     stage: 0,
     score: 0,
     lastSubmission: null,
     error: null,
-    roundPath: ROUND_PATHS[0], // Default path
+    roundPath: getRoundPath(localStorage.getItem('teamId')), // Restore path
 };
 
 // Actions
@@ -81,6 +81,23 @@ function gameReducer(state, action) {
                 ...state,
                 ...action.payload,
             };
+        case ACTION.LOGOUT:
+            localStorage.removeItem('CODECRYPT_STATE');
+            localStorage.removeItem('teamId');
+            localStorage.removeItem('teamName');
+            localStorage.removeItem('teamEmail');
+            return {
+                screen: 'WELCOME',
+                teamId: null,
+                teamName: null,
+                teamEmail: null,
+                round: 0,
+                stage: 0,
+                score: 0,
+                lastSubmission: null,
+                error: null,
+                roundPath: ROUND_PATHS[0],
+            };
         default:
             return state;
     }
@@ -107,7 +124,9 @@ export function GameProvider({ children }) {
 
     useEffect(() => {
         console.log('Game State Updated:', state);
-        localStorage.setItem('CODECRYPT_STATE', JSON.stringify(state));
+        if (state.teamId) {
+            localStorage.setItem('CODECRYPT_STATE', JSON.stringify(state));
+        }
     }, [state]);
 
     const login = (id, name, email) => {
@@ -116,6 +135,10 @@ export function GameProvider({ children }) {
             return;
         }
         dispatch({ type: ACTION.LOGIN, payload: { id, name, email } });
+    };
+
+    const logout = () => {
+        dispatch({ type: ACTION.LOGOUT });
     };
 
     const startRound = (roundNumber, duration = 600) => {
@@ -144,12 +167,18 @@ export function GameProvider({ children }) {
             // ROUND COMPLETION HELPER
             const completeRound = (pointsToAdd = 0, msg = null) => {
                 const nextRound = getNextRound(state.round);
-                const nextStage = nextRound === 5 ? 0 : 1;
-                console.log(`Round ${state.round} Complete. Moving to Round ${nextRound}`);
+                const nextStage = 1;
+                console.log(`Round ${state.round} Complete. Auto-proceeding to Round ${nextRound}...`);
 
                 dispatch({
                     type: ACTION.ADMIN_OVERRIDE,
-                    payload: { round: nextRound, stage: nextStage, score: state.score + pointsToAdd, error: null }
+                    payload: {
+                        round: nextRound,
+                        stage: nextStage,
+                        score: state.score + pointsToAdd,
+                        screen: nextRound > 4 ? 'LOBBY' : 'GAME',
+                        error: null
+                    }
                 });
                 return { success: true, message: msg || 'ROUND COMPLETE' };
             };
@@ -209,7 +238,7 @@ export function GameProvider({ children }) {
     };
 
     return (
-        <GameContext.Provider value={{ state, login, startRound, submitAnswer, adminOverride, error: state.error }}>
+        <GameContext.Provider value={{ state, login, logout, startRound, submitAnswer, adminOverride, error: state.error }}>
             {children}
         </GameContext.Provider>
     );

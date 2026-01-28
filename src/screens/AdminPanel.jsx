@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import './AdminPanel.css';
 
 const AdminPanel = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('isAdmin') === 'true');
+    const [loginCreds, setLoginCreds] = useState({ username: '', password: '' });
+
     const [teams, setTeams] = useState([]);
     const [submissions, setSubmissions] = useState([]);
     const [activeTab, setActiveTab] = useState('teams'); // 'teams', 'activity'
@@ -25,7 +28,28 @@ const AdminPanel = () => {
     });
     const [showOverrideForm, setShowOverrideForm] = useState(false);
 
-    // Fetch all submissions
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        fetchTeams();
+        fetchSubmissions();
+        const interval = setInterval(() => {
+            if (activeTab === 'activity') fetchSubmissions();
+            else fetchTeams();
+        }, 5000); // Auto-refresh every 5s
+        return () => clearInterval(interval);
+    }, [activeTab, isAuthenticated]);
+
+    const fetchTeams = async () => {
+        try {
+            const response = await fetch('http://localhost:3001/api/admin/teams');
+            const data = await response.json();
+            setTeams(data);
+        } catch (error) {
+            console.error('Error fetching teams:', error);
+        }
+    };
+
     const fetchSubmissions = async () => {
         try {
             const response = await fetch('http://localhost:3001/api/admin/submissions');
@@ -36,15 +60,123 @@ const AdminPanel = () => {
         }
     };
 
-    useEffect(() => {
-        fetchTeams();
-        fetchSubmissions();
-        const interval = setInterval(() => {
-            if (activeTab === 'activity') fetchSubmissions();
-            else fetchTeams();
-        }, 5000); // Auto-refresh every 5s
-        return () => clearInterval(interval);
-    }, [activeTab]);
+    const handleLogin = (e) => {
+        e.preventDefault();
+        if (loginCreds.username === 'admin' && loginCreds.password === 'admin123') {
+            setIsAuthenticated(true);
+            localStorage.setItem('isAdmin', 'true');
+        } else {
+            alert('Invalid Admin Credentials');
+        }
+    };
+
+    if (!isAuthenticated) {
+        return (
+            <>
+                <style>
+                    {`
+                    .admin-login-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100vh;
+                        background-color: #050505;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 9999;
+                    }
+                    .admin-login-card {
+                        background: #111;
+                        border: 1px solid #333;
+                        padding: 3rem;
+                        border-radius: 12px;
+                        width: 100%;
+                        max-width: 400px;
+                        box-shadow: 0 0 50px rgba(0,255,65,0.1);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 1.5rem;
+                    }
+                    .admin-login-title {
+                        color: #00ff41;
+                        text-align: center;
+                        font-family: monospace;
+                        font-size: 1.5rem;
+                        margin-bottom: 1rem;
+                        letter-spacing: 2px;
+                    }
+                    .admin-input-group label {
+                        color: #888;
+                        font-size: 0.8rem;
+                        font-family: monospace;
+                        display: block;
+                        margin-bottom: 5px;
+                    }
+                    .admin-login-input {
+                        width: 100%;
+                        padding: 1rem;
+                        background: #000;
+                        border: 1px solid #333;
+                        color: #fff;
+                        font-family: monospace;
+                        font-size: 1rem;
+                        border-radius: 4px;
+                    }
+                    .admin-login-btn {
+                        width: 100%;
+                        padding: 1rem;
+                        background: #00ff41;
+                        color: #000;
+                        border: none;
+                        font-weight: bold;
+                        cursor: pointer;
+                        text-transform: uppercase;
+                        font-family: monospace;
+                    }
+                    `}
+                </style>
+                <div className="admin-login-overlay">
+                    <form onSubmit={handleLogin} className="admin-login-card">
+                        <h2 className="admin-login-title">ADMIN TERMINAL</h2>
+
+                        <div className="admin-input-group">
+                            <label>admin_user</label>
+                            <input
+                                type="text"
+                                value={loginCreds.username}
+                                onChange={e => setLoginCreds({ ...loginCreds, username: e.target.value })}
+                                className="admin-login-input"
+                            />
+                        </div>
+
+                        <div className="admin-input-group">
+                            <label>passkey</label>
+                            <input
+                                type="password"
+                                value={loginCreds.password}
+                                onChange={e => setLoginCreds({ ...loginCreds, password: e.target.value })}
+                                className="admin-login-input"
+                            />
+                        </div>
+
+                        <button type="submit" className="admin-login-btn">
+                            AUTHENTICATE
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'login' } }))}
+                            style={{ background: 'transparent', border: 'none', color: '#666', marginTop: '10px', width: '100%', cursor: 'pointer' }}
+                        >
+                            &larr; Return to System
+                        </button>
+                    </form>
+                </div>
+            </>
+        );
+    }
 
     // Generate random login code
     const generateLoginCode = () => {
@@ -176,12 +308,23 @@ const AdminPanel = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem('isAdmin');
+        setIsAuthenticated(false);
+        window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'login' } }));
+    };
+
     return (
         <div className="admin-container">
             <div className="admin-header">
                 <h1>🔐 CODECRYPT Admin Panel</h1>
                 <p>Manage teams and credentials</p>
+                <button onClick={handleLogout} className="admin-logout-btn">
+                    LOGOUT
+                </button>
             </div>
+
+            <br />
 
             {message.text && (
                 <div className={`admin-message ${message.type}`}>
@@ -384,6 +527,7 @@ const AdminPanel = () => {
                                         <th>Team ID</th>
                                         <th>Team Name</th>
                                         <th>Email</th>
+                                        <th>Login Code</th>
                                         <th>Round</th>
                                         <th>Stage</th>
                                         <th>Score</th>
@@ -397,6 +541,7 @@ const AdminPanel = () => {
                                             <td><code>{team.team_id}</code></td>
                                             <td><strong>{team.team_name}</strong></td>
                                             <td>{team.email}</td>
+                                            <td><code style={{ color: '#00ff41' }}>{team.login_code}</code></td>
                                             <td>Round {team.current_round}</td>
                                             <td>Stage {team.current_stage}</td>
                                             <td className="score">{team.total_score}</td>
