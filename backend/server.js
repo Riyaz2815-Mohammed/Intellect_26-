@@ -58,26 +58,63 @@ transporter.verify(function (error, success) {
     }
 });
 
+// ==================== GLOBAL CONFIG ====================
+
+// Get Global Config
+app.get('/api/config', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT config_key, config_value FROM event_config');
+        const config = rows.reduce((acc, row) => {
+            acc[row.config_key] = row.config_value;
+            return acc;
+        }, {});
+        res.json(config);
+    } catch (error) {
+        console.error('Config fetch error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Update Global Config (Admin)
+app.post('/api/admin/config', async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        await pool.query(
+            'INSERT INTO event_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = NOW()',
+            [key, value.toString(), value.toString()]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Config update error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ==================== AUTHENTICATION ====================
 
 // Team Login
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { teamName, loginCode } = req.body;
+        console.log(`[LOGIN ATTEMPT] Name=${teamName}, Code=${loginCode}`);
 
         const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE team_name = ? AND login_code = ? AND is_active = TRUE',
-            [teamName, loginCode]
+            'SELECT * FROM teams WHERE LOWER(team_name) = LOWER(?) AND LOWER(login_code) = LOWER(?)',
+            [teamName.trim(), loginCode.trim()]
         );
 
         if (teams.length === 0) {
-            return res.status(401).json({
-                success: false,
-                error: 'Invalid team name or login code'
-            });
+            console.warn(`[LOGIN FAILED] Invalid credentials for: ${teamName}`);
+            return res.status(401).json({ success: false, error: 'Invalid team name or login code' });
         }
 
         const team = teams[0];
+
+        if (!team.is_active) {
+            console.warn(`[LOGIN FAILED] Team inactive: ${teamName}`);
+            return res.status(401).json({ success: false, error: 'Account inactive' });
+        }
+
         res.json({
             success: true,
             team: {
@@ -357,7 +394,7 @@ app.get('/api/admin/leaderboard', async (req, res) => {
 app.get('/api/admin/teams', async (req, res) => {
     try {
         const [teams] = await pool.query(
-            'SELECT team_id, team_name, email, current_round, current_stage, total_score, is_active FROM teams ORDER BY total_score DESC'
+            'SELECT team_id, team_name, email, login_code, current_round, current_stage, total_score, is_active FROM teams ORDER BY total_score DESC'
         );
         res.json(teams);
     } catch (error) {
@@ -404,6 +441,10 @@ app.post('/api/admin/override', async (req, res) => {
 app.post('/api/admin/create-team', async (req, res) => {
     try {
         const { teamName, email, loginCode } = req.body;
+        console.log(`[CREATE TEAM] Request received: Name=${teamName}, Email=${email}, Code=${loginCode}`);
+
+        const cleanTeamName = teamName.trim();
+        const cleanLoginCode = loginCode.trim();
 
         // Generate team ID
         const teamId = `TM-${Date.now().toString().slice(-6)}`;
@@ -412,10 +453,11 @@ app.post('/api/admin/create-team', async (req, res) => {
         // Check if team name or email already exists
         const [existing] = await pool.query(
             'SELECT team_id FROM teams WHERE team_name = ? OR email = ?',
-            [teamName, email]
+            [cleanTeamName, email]
         );
 
         if (existing.length > 0) {
+            console.warn(`[CREATE TEAM] Duplicate found: ${cleanTeamName} or ${email}`);
             return res.status(400).json({
                 success: false,
                 error: 'Team name or email already exists'
@@ -423,10 +465,12 @@ app.post('/api/admin/create-team', async (req, res) => {
         }
 
         // Insert team
-        await pool.query(
+        console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
+        const [result] = await pool.query(
             'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES (?, ?, ?, ?, ?)',
-            [teamId, teamName, email, loginCode, accessCode]
+            [teamId, cleanTeamName, email, cleanLoginCode, accessCode]
         );
+        console.log(`[CREATE TEAM] Insert result: Affected Rows = ${result.affectedRows}`);
 
         // Start tracking time for Round 1 Stage 1 immediately
         await pool.query(
