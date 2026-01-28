@@ -61,16 +61,21 @@ export const GameService = {
 
         // Round 3 Logic: Flash Memory + Pressure
         if (round === 3) {
-            if (stage <= 3) {
+            if (stage <= 5) {
                 const question = ROUND3_QUESTIONS[stage - 1];
 
-                // Q1: Custom validation function
-                if (question.type === 'TABLE_FLASH') {
+                // Check if specialized validation function exists
+                if (question.validateFn) {
                     if (question.validateFn(input)) {
-                        return { success: true, points: 150, message: 'ANALYSIS ACCEPTED' };
+                        return { success: true, points: 150, message: 'ACCEPTED' };
                     } else {
-                        return { success: false, message: 'INCOMPLETE OR INCORRECT REASONING' };
+                        return { success: false, message: 'INCORRECT ANSWER' };
                     }
+                }
+
+                // Q1: Custom validation function (Handled by generic check above, but keeping specific message if needed)
+                if (question.type === 'TABLE_FLASH' && !question.validateFn) {
+                    // Fallback or legacy handling if needed
                 }
 
                 // Q2: Query recall - normalize and compare
@@ -94,8 +99,8 @@ export const GameService = {
                 }
             }
 
-            // Stage 4: Physical code entry
-            if (stage === 4) {
+            // Stage 6: Physical code entry
+            if (stage === 6) {
                 if (input.trim().toUpperCase() === ROUND3_CODE) {
                     return { success: true, points: 300, message: 'ROUND 3 COMPLETE - FINAL ROUND UNLOCKED' };
                 } else {

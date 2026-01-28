@@ -33,13 +33,13 @@ export const ROUND3_QUESTIONS = [
             const hasReason = normalized.includes('cpu') || normalized.includes('load') || normalized.includes('98') || normalized.includes('18') || normalized.includes('high');
             return hasName && hasReason;
         },
-        answer: "NetStorm - HighError Rate "|| "NetStorm - High CPU Load" || "NetStorm - High Users" || "Netstrom - high load" || "Netstorm - high users" || "Netstorm - high error rate" || "Netstorm - high cpu load" || "Netstorm - high users" || "Netstorm - high error rate" || "Netstorm - high cpu load" || "Netstorm - high users" || "Netstorm - high error rate"
+        answer: "NetStorm - HighError Rate " || "NetStorm - High CPU Load" || "NetStorm - High Users" || "Netstrom - high load" || "Netstorm - high users" || "Netstorm - high error rate" || "Netstorm - high cpu load" || "Netstorm - high users" || "Netstorm - high error rate" || "Netstorm - high cpu load" || "Netstorm - high users" || "Netstorm - high error rate"
     },
     {
         // subquery
         id: 2,
         type: 'QUERY_FLASH',
-        flashDuration: 15,
+        flashDuration: 20,
         flashData: FLASH_QUERY,
         prompt: "Forensic Reconstruction: Re-type the efficiency analysis query EXACTLY.",
         hint: "SELECT name, efficiency calculation...",
@@ -50,12 +50,12 @@ export const ROUND3_QUESTIONS = [
         type: 'TABLE_FLASH',
         flashDuration: 15,
         flashData: EVENTS_TABLE,
-        prompt: "Quick Audit: Which Event ID corresponds to the 'CyberWall' event?",
+        prompt: "Quick Audit: What is the status corresponds to the 'CyberWall' event?",
         hint: "Memorize the ID column",
         validateFn: (input) => {
-            return input.toLowerCase().trim() === 'e-105';
+            return input.toLowerCase().trim() === 'stable';
         },
-        answer: "E-105"
+        answer: "stable"
     },
     {
         id: 4,
@@ -76,6 +76,10 @@ export const ROUND3_QUESTIONS = [
         flashData: CONFIG_FLASH,
         prompt: "Config Restoration: Re-type the JSON configuration string EXACTLY.",
         hint: "Mind the quotes and brackets",
+        validateFn: (input) => {
+            // Strict check for JSON structure
+            return input.trim() === CONFIG_FLASH.trim();
+        },
         answer: CONFIG_FLASH
     }
 ];

@@ -27,7 +27,7 @@ export const STUDENTS_TABLE = COLLEGE_DATA.students;
 export const ROUND2_QUESTIONS = [
     {
         id: 1,
-        text: "Identify the Target. Write a query to find the `id` and Score In dbms of the student named 'Rahul'.",
+        text: "Identify the Target. Write a query to find the `id` and Score In dbms of the student named 'Rahul' and subject db_ms.",
         hint: "Filter by name , and subject DB_MS ",
         answer: "SELECT id, score FROM students JOIN assignments ON students.id = assignments.student_id WHERE students.name = 'Rahul' AND assignments.subject = 'DB_MS'",
         validation: {
@@ -49,15 +49,15 @@ export const ROUND2_QUESTIONS = [
         id: 3,
         text: "Find the top scorers in each department with attendance > 90%",
         hint: "join , group by, order by, limit",
-        answer: "SELECT name, score FROM students JOIN assignments ON students.id = assignments.student_id WHERE students.attendance > 90 ORDER BY assignments.score DESC LIMIT 1",
+        answer: "SELECT name, score FROM students JOIN assignments ON students.id = assignments.student_id WHERE students.attendance > 90 ORDER BY assignments.score DESC",
         validation: {
-            required: ['select', 'name', 'score', 'from', 'students', 'join', 'on', 'assignments', 'where', 'attendance', '90', 'order by', 'score', 'desc', 'limit', '1'],
+            required: ['select', 'name', 'score', 'from', 'students', 'join', 'on', 'assignments', 'where', 'attendance', '90', 'order by', 'score', 'desc'],
             forbidden: []
         }
     },
     {
         id: 4,
-        text: "Full Profile. Write a 3-table JOIN to show Rahul's Name, Department Head, and Assignment Subject.",
+        text: "Write a 3-table JOIN to show Rahul's Name, Department Head, and Assignment Subject.",
         hint: "JOIN students, departments, and assignments",
         answer: "SELECT students.name, departments.head, assignments.subject FROM students JOIN departments ON students.dept = departments.code JOIN assignments ON students.id = assignments.student_id WHERE students.id = 101",
         validation: {
