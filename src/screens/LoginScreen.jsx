@@ -13,6 +13,16 @@ const LoginScreen = ({ onLogin }) => {
         setLoading(true);
 
         try {
+            // Check if admin credentials
+            if (teamName.toLowerCase() === 'admin' && loginCode === 'admin123') {
+                // Admin login - navigate to admin panel
+                localStorage.setItem('isAdmin', 'true');
+                window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'admin' } }));
+                setLoading(false);
+                return;
+            }
+
+            // Regular team login
             const response = await fetch('http://localhost:3001/api/auth/login', {
                 method: 'POST',
                 headers: {
@@ -31,6 +41,7 @@ const LoginScreen = ({ onLogin }) => {
                 localStorage.setItem('teamId', data.team.id);
                 localStorage.setItem('teamName', data.team.name);
                 localStorage.setItem('teamEmail', data.team.email);
+                localStorage.setItem('isAdmin', 'false');
 
                 // Call parent onLogin
                 onLogin(data.team);
@@ -43,10 +54,6 @@ const LoginScreen = ({ onLogin }) => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const navigateToAdmin = () => {
-        window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'admin' } }));
     };
 
     return (
@@ -81,7 +88,7 @@ const LoginScreen = ({ onLogin }) => {
                         <label htmlFor="loginCode">LOGIN CODE</label>
                         <input
                             id="loginCode"
-                            type="text"
+                            type="password"
                             value={loginCode}
                             onChange={(e) => setLoginCode(e.target.value)}
                             placeholder="Enter your login code..."
@@ -121,12 +128,6 @@ const LoginScreen = ({ onLogin }) => {
                     <p className="footer-text">
                         Don't have credentials? Contact the admin desk.
                     </p>
-                    <button
-                        className="admin-link"
-                        onClick={navigateToAdmin}
-                    >
-                        Admin Panel →
-                    </button>
                 </div>
             </div>
         </div>

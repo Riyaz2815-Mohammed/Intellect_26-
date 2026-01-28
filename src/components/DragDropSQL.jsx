@@ -1,29 +1,32 @@
 import React, { useState } from 'react';
 
 const DragDropSQL = ({ fragments, onSubmit }) => {
-    const [availableFragments, setAvailableFragments] = useState([...fragments]);
+    // Map fragments to objects with unique IDs to handle duplicates like "COUNT(*)"
+    const prepareFragments = (list) => list.map((text, idx) => ({ id: `frag-${idx}`, text }));
+
+    const [availableFragments, setAvailableFragments] = useState(prepareFragments(fragments));
     const [orderedFragments, setOrderedFragments] = useState([]);
     const [draggedItem, setDraggedItem] = useState(null);
 
     // Reset state when fragments prop changes (e.g. next stage)
     React.useEffect(() => {
-        setAvailableFragments([...fragments]);
+        setAvailableFragments(prepareFragments(fragments));
         setOrderedFragments([]);
         setDraggedItem(null);
     }, [fragments]);
 
-    const handleItemClick = (fragment, source) => {
+    const handleItemClick = (fragmentObj, source) => {
         if (source === 'available') {
-            setAvailableFragments(prev => prev.filter(f => f !== fragment));
-            setOrderedFragments(prev => [...prev, fragment]);
+            setAvailableFragments(prev => prev.filter(f => f.id !== fragmentObj.id));
+            setOrderedFragments(prev => [...prev, fragmentObj]);
         } else if (source === 'ordered') {
-            setOrderedFragments(prev => prev.filter(f => f !== fragment));
-            setAvailableFragments(prev => [...prev, fragment]);
+            setOrderedFragments(prev => prev.filter(f => f.id !== fragmentObj.id));
+            setAvailableFragments(prev => [...prev, fragmentObj]);
         }
     };
 
-    const handleDragStart = (e, fragment, source) => {
-        setDraggedItem({ fragment, source });
+    const handleDragStart = (e, fragmentObj, source) => {
+        setDraggedItem({ fragmentObj, source });
         e.dataTransfer.effectAllowed = 'move';
     };
 
@@ -36,22 +39,20 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
         e.preventDefault();
         if (!draggedItem) return;
 
-        const { fragment, source } = draggedItem;
+        const { fragmentObj, source } = draggedItem;
 
         if (source === 'available') {
-            // Remove from available
-            setAvailableFragments(prev => prev.filter(f => f !== fragment));
-            // Add to ordered at specific position
+            setAvailableFragments(prev => prev.filter(f => f.id !== fragmentObj.id));
             setOrderedFragments(prev => {
                 const newOrdered = [...prev];
-                newOrdered.splice(index, 0, fragment);
+                newOrdered.splice(index, 0, fragmentObj);
                 return newOrdered;
             });
         } else if (source === 'ordered') {
-            // Reorder within ordered
             setOrderedFragments(prev => {
-                const newOrdered = prev.filter(f => f !== fragment);
-                newOrdered.splice(index, 0, fragment);
+                const filtered = prev.filter(f => f.id !== fragmentObj.id);
+                const newOrdered = [...filtered];
+                newOrdered.splice(index, 0, fragmentObj);
                 return newOrdered;
             });
         }
@@ -63,25 +64,23 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
         e.preventDefault();
         if (!draggedItem) return;
 
-        const { fragment, source } = draggedItem;
+        const { fragmentObj, source } = draggedItem;
 
         if (source === 'ordered') {
-            // Remove from ordered
-            setOrderedFragments(prev => prev.filter(f => f !== fragment));
-            // Add back to available
-            setAvailableFragments(prev => [...prev, fragment]);
+            setOrderedFragments(prev => prev.filter(f => f.id !== fragmentObj.id));
+            setAvailableFragments(prev => [...prev, fragmentObj]);
         }
 
         setDraggedItem(null);
     };
 
     const handleSubmitOrder = () => {
-        const query = orderedFragments.join('\n');
+        const query = orderedFragments.map(f => f.text).join('\n');
         onSubmit(query);
     };
 
     const handleReset = () => {
-        setAvailableFragments([...fragments]);
+        setAvailableFragments(prepareFragments(fragments));
         setOrderedFragments([]);
     };
 
@@ -111,12 +110,12 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                             All fragments used
                         </div>
                     ) : (
-                        availableFragments.map((fragment, idx) => (
+                        availableFragments.map((fragmentObj) => (
                             <div
-                                key={`avail-${idx}`}
+                                key={fragmentObj.id}
                                 draggable
-                                onDragStart={(e) => handleDragStart(e, fragment, 'available')}
-                                onClick={() => handleItemClick(fragment, 'available')}
+                                onDragStart={(e) => handleDragStart(e, fragmentObj, 'available')}
+                                onClick={() => handleItemClick(fragmentObj, 'available')}
                                 style={{
                                     background: 'var(--bg-tertiary)',
                                     padding: '0.75rem',
@@ -124,12 +123,12 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                                     fontFamily: 'var(--font-code)',
                                     cursor: 'grab',
                                     transition: 'all 0.2s',
-                                    opacity: draggedItem?.fragment === fragment ? 0.5 : 1
+                                    opacity: draggedItem?.fragmentObj?.id === fragmentObj.id ? 0.5 : 1
                                 }}
                                 onMouseEnter={(e) => e.currentTarget.style.borderLeftColor = 'var(--accent-primary)'}
                                 onMouseLeave={(e) => e.currentTarget.style.borderLeftColor = 'var(--accent-secondary)'}
                             >
-                                {fragment}
+                                {fragmentObj.text}
                             </div>
                         ))
                     )}
@@ -169,8 +168,8 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                         </div>
                     ) : (
                         <>
-                            {orderedFragments.map((fragment, idx) => (
-                                <React.Fragment key={`ordered-${idx}`}>
+                            {orderedFragments.map((fragmentObj, idx) => (
+                                <React.Fragment key={fragmentObj.id}>
                                     <div
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDropToOrdered(e, idx)}
@@ -178,8 +177,8 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                                     />
                                     <div
                                         draggable
-                                        onDragStart={(e) => handleDragStart(e, fragment, 'ordered')}
-                                        onClick={() => handleItemClick(fragment, 'ordered')}
+                                        onDragStart={(e) => handleDragStart(e, fragmentObj, 'ordered')}
+                                        onClick={() => handleItemClick(fragmentObj, 'ordered')}
                                         style={{
                                             background: 'var(--bg-secondary)',
                                             padding: '0.75rem',
@@ -189,13 +188,13 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '0.5rem',
-                                            opacity: draggedItem?.fragment === fragment ? 0.5 : 1
+                                            opacity: draggedItem?.fragmentObj?.id === fragmentObj.id ? 0.5 : 1
                                         }}
                                     >
                                         <span style={{ color: 'var(--accent-warning)', fontWeight: 'bold', minWidth: '20px' }}>
                                             {idx + 1}.
                                         </span>
-                                        <span>{fragment}</span>
+                                        <span>{fragmentObj.text}</span>
                                     </div>
                                 </React.Fragment>
                             ))}

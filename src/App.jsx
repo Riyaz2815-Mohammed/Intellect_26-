@@ -4,6 +4,7 @@ import LoginScreen from './screens/LoginScreen';
 import LobbyScreen from './screens/LobbyScreen';
 import GameScreen from './screens/GameScreen';
 import AdminPanel from './screens/AdminPanel';
+import QuickAdmin from './components/QuickAdmin';
 
 function App() {
   const { state } = useGame();
@@ -69,6 +70,8 @@ function App() {
         <main style={{ flex: 1, position: 'relative' }}>
           <ScreenComponent />
         </main>
+
+        <QuickAdmin />
       </div>
     );
   };
@@ -85,7 +88,12 @@ function App() {
     return () => window.removeEventListener('navigate', handleNavigation);
   }, []);
 
-  return renderView();
+  return (
+    <>
+      {renderView()}
+      <QuickAdmin />
+    </>
+  );
 }
 
 export default App;

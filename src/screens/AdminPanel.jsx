@@ -3,6 +3,8 @@ import './AdminPanel.css';
 
 const AdminPanel = () => {
     const [teams, setTeams] = useState([]);
+    const [submissions, setSubmissions] = useState([]);
+    const [activeTab, setActiveTab] = useState('teams'); // 'teams', 'activity'
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -14,20 +16,35 @@ const AdminPanel = () => {
         loginCode: ''
     });
 
-    // Fetch all teams
-    const fetchTeams = async () => {
+    const [overrideData, setOverrideData] = useState({
+        teamId: '',
+        teamName: '',
+        round: 1,
+        stage: 1,
+        score: 0
+    });
+    const [showOverrideForm, setShowOverrideForm] = useState(false);
+
+    // Fetch all submissions
+    const fetchSubmissions = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/admin/teams');
+            const response = await fetch('http://localhost:3001/api/admin/submissions');
             const data = await response.json();
-            setTeams(data);
+            setSubmissions(data);
         } catch (error) {
-            console.error('Error fetching teams:', error);
+            console.error('Error fetching submissions:', error);
         }
     };
 
     useEffect(() => {
         fetchTeams();
-    }, []);
+        fetchSubmissions();
+        const interval = setInterval(() => {
+            if (activeTab === 'activity') fetchSubmissions();
+            else fetchTeams();
+        }, 5000); // Auto-refresh every 5s
+        return () => clearInterval(interval);
+    }, [activeTab]);
 
     // Generate random login code
     const generateLoginCode = () => {
@@ -114,6 +131,51 @@ const AdminPanel = () => {
         }
     };
 
+    // Admin Override
+    const handleOverrideSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const response = await fetch('http://localhost:3001/api/admin/override', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    teamId: overrideData.teamId,
+                    round: parseInt(overrideData.round),
+                    stage: parseInt(overrideData.stage),
+                    score: parseInt(overrideData.score)
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                setMessage({ type: 'success', text: `State updated for team: ${overrideData.teamName}` });
+                setShowOverrideForm(false);
+                fetchTeams();
+            } else {
+                setMessage({ type: 'error', text: data.error || 'Failed to override state' });
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Error: Connection failed' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openOverride = (team) => {
+        setOverrideData({
+            teamId: team.team_id,
+            teamName: team.team_name,
+            round: team.current_round,
+            stage: team.current_stage,
+            score: team.total_score
+        });
+        setShowOverrideForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
         <div className="admin-container">
             <div className="admin-header">
@@ -127,132 +189,253 @@ const AdminPanel = () => {
                 </div>
             )}
 
-            <div className="admin-actions">
+            <div className="admin-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
                 <button
-                    className="btn-primary"
-                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    className={`tab-btn ${activeTab === 'teams' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('teams')}
+                    style={{ background: activeTab === 'teams' ? 'var(--accent-primary)' : 'transparent', border: '1px solid #444', color: activeTab === 'teams' ? '#000' : '#fff', padding: '10px 20px', cursor: 'pointer', borderRadius: '4px' }}
                 >
-                    {showCreateForm ? '❌ Cancel' : '➕ Create New Team'}
+                    👥 Team Management
                 </button>
                 <button
-                    className="btn-secondary"
-                    onClick={fetchTeams}
+                    className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('activity')}
+                    style={{ background: activeTab === 'activity' ? 'var(--accent-secondary)' : 'transparent', border: '1px solid #444', color: activeTab === 'activity' ? '#000' : '#fff', padding: '10px 20px', cursor: 'pointer', borderRadius: '4px' }}
                 >
-                    🔄 Refresh
+                    📡 Live Activity
                 </button>
             </div>
 
-            {showCreateForm && (
-                <div className="create-team-form">
-                    <h2>Create New Team</h2>
-                    <form onSubmit={handleCreateTeam}>
-                        <div className="form-group">
-                            <label>Team Name *</label>
-                            <input
-                                type="text"
-                                value={formData.teamName}
-                                onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-                                placeholder="Enter team name..."
-                                required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Email *</label>
-                            <input
-                                type="email"
-                                value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="team@example.com"
-                                required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>Login Code *</label>
-                            <div className="input-with-button">
-                                <input
-                                    type="text"
-                                    value={formData.loginCode}
-                                    onChange={(e) => setFormData({ ...formData, loginCode: e.target.value })}
-                                    placeholder="LOGIN-XXXX"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={generateLoginCode}
-                                    className="btn-generate"
-                                >
-                                    🎲 Generate
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="form-actions">
-                            <button
-                                type="submit"
-                                className="btn-submit"
-                                disabled={loading}
-                            >
-                                {loading ? '⏳ Creating...' : '✅ Create & Send Email'}
-                            </button>
-                        </div>
-                    </form>
+            {activeTab === 'activity' && (
+                <div className="activity-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h2>Live Submission Log</h2>
+                        <button className="btn-secondary" onClick={fetchSubmissions}>🔄 Refresh Activity</button>
+                    </div>
+                    <div className="teams-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Team</th>
+                                    <th>Target</th>
+                                    <th>Result</th>
+                                    <th>Answer / Error</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {submissions.map((sub, i) => (
+                                    <tr key={i} style={{ opacity: sub.is_correct ? 1 : 0.8 }}>
+                                        <td style={{ fontSize: '12px' }}>{new Date(sub.submitted_at).toLocaleTimeString()}</td>
+                                        <td><strong>{sub.team_name}</strong></td>
+                                        <td>R{sub.round} S{sub.stage}</td>
+                                        <td>
+                                            <span style={{ color: sub.is_correct ? '#00ff41' : '#ff3333' }}>
+                                                {sub.is_correct ? '✅ CORRECT' : '❌ FAILED'}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: '11px', fontFamily: 'monospace', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {sub.is_correct ? '--- hidden ---' : (sub.error_message || sub.submitted_answer)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
-            <div className="teams-section">
-                <h2>Teams ({teams.length})</h2>
-                <div className="teams-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Team ID</th>
-                                <th>Team Name</th>
-                                <th>Email</th>
-                                <th>Round</th>
-                                <th>Stage</th>
-                                <th>Score</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {teams.map((team) => (
-                                <tr key={team.team_id} className={!team.is_active ? 'inactive' : ''}>
-                                    <td><code>{team.team_id}</code></td>
-                                    <td><strong>{team.team_name}</strong></td>
-                                    <td>{team.email}</td>
-                                    <td>Round {team.current_round}</td>
-                                    <td>Stage {team.current_stage}</td>
-                                    <td className="score">{team.total_score}</td>
-                                    <td>
-                                        <span className={`status-badge ${team.is_active ? 'active' : 'inactive'}`}>
-                                            {team.is_active ? '✅ Active' : '❌ Inactive'}
-                                        </span>
-                                    </td>
-                                    <td className="actions">
+            {activeTab === 'teams' && (
+                <>
+                    <div className="admin-actions">
+                        <button
+                            className="btn-primary"
+                            onClick={() => setShowCreateForm(!showCreateForm)}
+                        >
+                            {showCreateForm ? '❌ Cancel' : '➕ Create New Team'}
+                        </button>
+                        <button
+                            className="btn-secondary"
+                            onClick={fetchTeams}
+                        >
+                            🔄 Refresh
+                        </button>
+                    </div>
+
+                    {showCreateForm && (
+                        <div className="create-team-form">
+                            <h2>Create New Team</h2>
+                            <form onSubmit={handleCreateTeam}>
+                                <div className="form-group">
+                                    <label>Team Name *</label>
+                                    <input
+                                        type="text"
+                                        value={formData.teamName}
+                                        onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
+                                        placeholder="Enter team name..."
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Email *</label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        placeholder="team@example.com"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Login Code *</label>
+                                    <div className="input-with-button">
+                                        <input
+                                            type="text"
+                                            value={formData.loginCode}
+                                            onChange={(e) => setFormData({ ...formData, loginCode: e.target.value })}
+                                            placeholder="LOGIN-XXXX"
+                                            required
+                                        />
                                         <button
-                                            onClick={() => handleResendCredentials(team.team_id, team.team_name, team.email)}
-                                            className="btn-action"
-                                            title="Resend credentials"
+                                            type="button"
+                                            onClick={generateLoginCode}
+                                            className="btn-generate"
                                         >
-                                            📧
+                                            🎲 Generate
                                         </button>
-                                        <button
-                                            onClick={() => handleToggleActive(team.team_id, team.is_active)}
-                                            className="btn-action"
-                                            title={team.is_active ? 'Deactivate' : 'Activate'}
-                                        >
-                                            {team.is_active ? '🔒' : '🔓'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-actions">
+                                    <button
+                                        type="submit"
+                                        className="btn-submit"
+                                        disabled={loading}
+                                    >
+                                        {loading ? '⏳ Creating...' : '✅ Create & Send Email'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {showOverrideForm && (
+                        <div className="create-team-form override-form" style={{ borderColor: '#ffcc00', borderStyle: 'dashed' }}>
+                            <h2 style={{ color: '#ffcc00' }}>⚡ Admin Override: {overrideData.teamName}</h2>
+                            <p style={{ fontSize: '12px', color: '#ffcc00', marginTop: '-10px', marginBottom: '15px' }}>
+                                Manual progress update. Use with caution.
+                            </p>
+                            <form onSubmit={handleOverrideSubmit}>
+                                <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                                    <div className="form-group" style={{ flex: '1 1 100px' }}>
+                                        <label>Round (1-4)</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="4"
+                                            value={overrideData.round}
+                                            onChange={(e) => setOverrideData({ ...overrideData, round: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ flex: '1 1 100px' }}>
+                                        <label>Stage</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="10"
+                                            value={overrideData.stage}
+                                            onChange={(e) => setOverrideData({ ...overrideData, stage: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ flex: '2 1 150px' }}>
+                                        <label>New Total Score</label>
+                                        <input
+                                            type="number"
+                                            value={overrideData.score}
+                                            onChange={(e) => setOverrideData({ ...overrideData, score: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-actions" style={{ display: 'flex', gap: '15px' }}>
+                                    <button type="submit" className="btn-submit" disabled={loading} style={{ background: '#ffcc00', color: '#000', fontWeight: 'bold' }}>
+                                        {loading ? '⏳ Processing...' : 'SAVE & APPLY OVERRIDE'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => setShowOverrideForm(false)}
+                                        style={{ border: '1px solid #444' }}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    <div className="teams-section">
+                        <h2>Teams ({teams.length})</h2>
+                        <div className="teams-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Team ID</th>
+                                        <th>Team Name</th>
+                                        <th>Email</th>
+                                        <th>Round</th>
+                                        <th>Stage</th>
+                                        <th>Score</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {teams.map((team) => (
+                                        <tr key={team.team_id} className={!team.is_active ? 'inactive' : ''}>
+                                            <td><code>{team.team_id}</code></td>
+                                            <td><strong>{team.team_name}</strong></td>
+                                            <td>{team.email}</td>
+                                            <td>Round {team.current_round}</td>
+                                            <td>Stage {team.current_stage}</td>
+                                            <td className="score">{team.total_score}</td>
+                                            <td>
+                                                <span className={`status-badge ${team.is_active ? 'active' : 'inactive'}`}>
+                                                    {team.is_active ? '✅ Active' : '❌ Inactive'}
+                                                </span>
+                                            </td>
+                                            <td className="actions">
+                                                <button
+                                                    onClick={() => handleResendCredentials(team.team_id, team.team_name, team.email)}
+                                                    className="btn-action"
+                                                    title="Resend credentials"
+                                                >
+                                                    📧
+                                                </button>
+                                                <button
+                                                    onClick={() => openOverride(team)}
+                                                    className="btn-action"
+                                                    title="Override State / Skip"
+                                                >
+                                                    ⚙️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleActive(team.team_id, team.is_active)}
+                                                    className="btn-action"
+                                                    title={team.is_active ? 'Deactivate' : 'Activate'}
+                                                >
+                                                    {team.is_active ? '🔒' : '🔓'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
