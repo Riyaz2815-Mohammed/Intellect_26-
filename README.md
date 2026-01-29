@@ -1,16 +1,115 @@
-# React + Vite
+# 🔐 CODECRYPT // INTELLECT '26
+ **The Ultimate Technical CTF Platform**
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+CodeCrypt is a high-fidelity, cinematic technical event platform designed for Intellect '26. It features a hacker-themed interface, real-time parallel game logic, and a multi-round competitive format ranging from SQL puzzles to physical code retrieval missions.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Quick Start (Dev Mode)
 
-## React Compiler
+### 1. Prerequisites
+- Node.js (v18+)
+- MySQL (Optional, for backend)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. Install & Run
+```bash
+# 1. Install Dependencies
+npm install
+cd backend && npm install && cd ..
 
-## Expanding the ESLint configuration
+# 2. Start Everything (Frontend + Backend)
+npm run dev
+# OR start separately:
+# Terminal 1: npm run dev
+# Terminal 2: node backend/server.js
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 3. Access the App
+- **Frontend**: [http://localhost:5173](http://localhost:5173)
+- **Admin Panel**: Login with `admin` / `admin123`
+- **Player Access**:
+  - **Team A**: User: `CodeWarriors` | Code: `WAR-001`
+  - **Team B**: User: `ByteBusters` | Code: `BYT-002`
+
+---
+
+## 🎮 Game Structure
+
+### Round 1: The Fragmentation (SQL Logic)
+- **Type**: Drag & Drop Query Builder
+- **Goal**: Reconstruct corrupted SQL queries.
+- **Unlock**: Physical location code.
+
+### Round 2: Data Forensics (Analysis)
+- **Type**: Data Analysis & Query Writing
+- **Goal**: Analyze student/college datasets to find outliers.
+- **Unlock**: Access to Round 3.
+
+### Round 3: Memory Stream (Flash)
+- **Type**: High-Pressure Flash Memory
+- **Goal**: Memorize disappearing tables/queries and answer in seconds.
+- **Mechanic**: 20s Flash Timer.
+
+### Round 4: The Advantage (Reasoning)
+- **Type**: Complex SQL Debugging
+- **Goal**: Match queries to outputs and fix broken logic.
+- **Reward**: Advantage keyword for the final round.
+
+### Round 5: Critical System Failure (Final)
+- **Type**: Parallel Data Recovery
+- **Goal**: Restore unique system nodes (Atlas, Orion, Vega, Nova).
+- **Final**: Physical Run to unique location -> Code Injection -> First Team Wins.
+
+---
+
+## 🛠️ Setup Guide
+
+### Backend & Database (MySQL)
+The system uses a local MySQL database for team authentication and state.
+👉 **[Read the Backend Setup Guide](docs/BACKEND_SETUP.md)**
+
+## 📊 Database Schema (MySQL)
+
+**Table: `teams`**
+- `id` (INT, PK, Auto Increment)
+- `team_id` (VARCHAR, Unique) - e.g. "TM-101"
+- `team_name` (VARCHAR) - e.g. "CodeWarriors"
+- `email` (VARCHAR)
+- `login_code` (VARCHAR) - Secret for login
+- `access_code` (VARCHAR)
+- `round` (INT) - Current Round (1-5)
+- `stage` (INT) - Current Stage
+- `score` (INT) - Total Points
+- `is_active` (BOOLEAN)
+- `created_at` (TIMESTAMP)
+
+This schema is automatically created by the `backend/schema.sql` file.
+
+---
+
+## 🛑 Admin Control Panel
+The Admin Panel is the control center for the event.
+- **Access**: Click the distinct "ADMIN" button in the bottom-right corner.
+- **Features**:
+  - **Live Dashboard**: See current round/stage for all teams.
+  - **Game Control**: Force jump teams to specific rounds (e.g., for testing).
+  - **Emergency Override**: Reset game, unlock stages.
+  - **Logs**: View submission history.
+
+---
+
+## 📂 Project Structure
+```
+/src
+  /components  # Reusable UI widgets (DragDrop, Terminal, etc.)
+  /context     # Global State (GameContext)
+  /data        # Round-specific Data (Questions, Answers, Variants)
+  /screens     # Main Views (Login, Lobby, Game, Admin)
+  /services    # API Logic (GameService, SupabaseClient)
+/backend       # Express Server (Emails, Auth)
+/docs          # Technical Documentation
+```
+
+---
+
+_Built for INTELLECT '26. System Status: ONLINE._

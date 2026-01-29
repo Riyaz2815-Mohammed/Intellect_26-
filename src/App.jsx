@@ -105,8 +105,6 @@ function App() {
         <main style={{ flex: 1, position: 'relative' }}>
           <ScreenComponent />
         </main>
-
-        <QuickAdmin />
       </div>
     );
   };

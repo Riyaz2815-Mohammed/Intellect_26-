@@ -1,14 +1,11 @@
 import { normalizeSQL, SQL_CHALLENGES, ROUND1_CODE, ROUND1_PLACE } from '../data/round1';
-import { COLLEGE_DATA, ROUND2_QUESTIONS, normalizeQuery, ROUND2_CODE, ROUND2_PLACE } from '../data/round2';
-import { ROUND3_QUESTIONS, ROUND3_CODE, ROUND3_PLACE } from '../data/round3';
+import { COLLEGE_DATA, ROUND2_QUESTIONS, normalizeQuery, ROUND2_PLACE, ROUND2_CODE } from '../data/round2';
+import { ROUND3_QUESTIONS, ROUND3_PLACE, ROUND3_CODE } from '../data/round3';
 import {
-    ROUND4_TABLES,
-    PHASE1_QUERIES,
-    PHASE1_OUTPUTS,
-    validatePhase1Matching,
-    PHASE2_QUESTIONS,
-    validatePhase2Answers,
-    ROUND4_PLACE
+    PROJECTS_TABLE, TEAMS_TABLE, TASKS_TABLE,
+    PHASE1_QUERIES, PHASE1_OUTPUTS, validatePhase1Matching,
+    PHASE2_QUESTIONS, validatePhase2Answers,
+    ROUND4_PLACE, ROUND4_TABLES
 } from '../data/round4';
 
 // Simulated Backend Service
@@ -172,16 +169,24 @@ export const GameService = {
                 }
             }
 
-            // Stage 3: Email code entry
+            // Stage 3: Physical Code Entry
             if (stage === 3) {
-                // In real implementation, validate against database
-                // For now, accept any code starting with INT26-R4-
-                const codePattern = /^INT26-R4-\d{4}$/i;
+                // Client-side format check (Backend does real validation)
+                const codePattern = /^CRPT-\d{4}$/i;
                 if (codePattern.test(input.trim())) {
-                    return { success: true, points: 200, message: 'ADVANTAGE CODE VERIFIED - FINAL ROUND UNLOCKED' };
+                    return { success: true, points: 200, message: 'PHYSICAL CODE VERIFIED' };
                 } else {
-                    return { success: false, message: 'INVALID ADVANTAGE CODE' };
+                    return { success: false, message: 'INVALID FORMAT: Expected CRPT-XXXX' };
                 }
+            }
+        }
+
+        // Round 5 Logic: Final Restoration
+        if (round === 5) {
+            if (input.trim().toUpperCase().startsWith('INT26-R5-') || input.trim().toUpperCase() === 'INT26-WIN') {
+                return { success: true, points: 500, isWinner: true, message: 'SYSTEM RESTORED: PROTOCOL COMPLETE' };
+            } else {
+                return { success: false, message: 'INVALID RESTORATION CODE' };
             }
         }
 
@@ -321,30 +326,52 @@ export const GameService = {
                 };
             }
 
-            // Stage 3: Email code entry
+            // Stage 3: Location Reveal / Physical Code
             if (stage === 3) {
                 return {
-                    type: 'EMAIL_CODE_ENTRY',
-                    title: 'ADVANTAGE CODE VERIFICATION',
-                    content: 'Check your email OR visit location for code',
-                    location: ROUND4_PLACE,
-                    hint: 'Code format: INT26-R4-XXXX',
-                    placeholder: 'Enter code from email...'
+                    type: 'LOCATION_REVEAL',
+                    title: 'PHYSICAL ACCESS REQUIRED',
+                    content: 'ADVANTAGE FRAGMENT LOCATED',
+                    hint: 'Proceed to location to retrieve code.',
+                    location: ROUND4_PLACE
                 };
             }
 
-            // Stage 4: Round complete
-            if (stage === 4) {
-                return {
-                    type: 'ROUND_COMPLETE',
-                    title: 'ADVANTAGE SECURED',
-                    content: 'You have earned an advantage for the Final Round!',
-                    hint: 'Prepare for the ultimate challenge.',
-                    placeholder: 'SYSTEM LOCKED'
-                };
-            }
+        }
+
+        if (round === 5) {
+            // Get Variant based on team ID (Deterministic)
+            // Assuming context passes teamId indirectly or we fetch it. 
+            // For now, let's assume the frontend passes variant or we derive it here.
+            // Since this function signature is (round, stage), we might need another way.
+            // But usually, GameScreen calls this. We can use a randomized or hashed approach
+            // if we don't have the team ID here. 
+            // WAIT: GameContext has state.teamId. GameService doesn't access context directly.
+            // We'll export a helper to get variant.
+            return {
+                type: 'ROUND_5_CORE',
+                title: 'CRITICAL SYSTEM RESTORATION',
+                stage: stage // Pass stage to component to handle internal state
+            };
         }
 
         return null;
+    },
+
+    getRound5Variant: (teamId) => {
+        if (!teamId) return 'A';
+        // Simple hash to map teamId to A, B, C, D
+        const lastChar = teamId.slice(-1);
+        const num = parseInt(lastChar, 10);
+
+        if (isNaN(num)) {
+            // If not a number, map letters
+            const code = lastChar.charCodeAt(0);
+            const variantIndex = code % 4;
+            return ['A', 'B', 'C', 'D'][variantIndex];
+        }
+
+        const variantIndex = num % 4;
+        return ['A', 'B', 'C', 'D'][variantIndex];
     }
 };

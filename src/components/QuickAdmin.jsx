@@ -13,10 +13,21 @@ const QuickAdmin = () => {
     // Make it visible even if not logged in
 
     const handleJump = () => {
+        const r = parseInt(jumpData.round);
+        const s = parseInt(jumpData.stage);
+
+        // Validation for Rounds and Stages
+        const MAX_STAGES = { 1: 5, 2: 5, 3: 6, 4: 3, 5: 6 }; // Phase mapping for testing
+
+        if (isNaN(r) || r < 1 || r > 5 || isNaN(s) || s < 1 || s > (MAX_STAGES[r] || 10)) {
+            alert('not the right no');
+            return;
+        }
+
         adminOverride({
-            round: parseInt(jumpData.round),
-            stage: parseInt(jumpData.stage),
-            score: parseInt(jumpData.score),
+            round: r,
+            stage: s,
+            score: parseInt(jumpData.score) || 0,
             screen: 'GAME'
         });
         setIsOpen(false);
@@ -103,20 +114,51 @@ const QuickAdmin = () => {
                         EXECUTE JUMP_
                     </button>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginTop: '5px' }}>
-                        <button
-                            onClick={() => adminOverride({ screen: 'LOBBY', teamId: 'ADMIN-TEST', teamName: 'DEBUG_MODE' })}
-                            style={{ fontSize: '0.7rem', border: '1px solid #444', color: '#fff', padding: '5px', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                            BYPASS_LOGIN
-                        </button>
-                        <button
-                            onClick={() => adminOverride({ round: 4, stage: 1, screen: 'GAME', teamId: 'ADMIN-TEST' })}
-                            style={{ fontSize: '0.7rem', border: '1px solid #444', color: '#fff', padding: '5px', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                            DEMO_R4
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            const nextStage = (parseInt(state.stage) || 0) + 1;
+                            adminOverride({
+                                ...state,
+                                stage: nextStage,
+                                screen: 'GAME'
+                            });
+                            // Also update local input to reflect change
+                            setJumpData(prev => ({ ...prev, stage: nextStage }));
+                        }}
+                        style={{
+                            background: '#ffcc00',
+                            color: '#000',
+                            padding: '8px',
+                            fontWeight: 'bold',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            marginTop: '5px',
+                            border: 'none',
+                            width: '100%'
+                        }}
+                    >
+                        SKIP STAGE {'>>'}
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            localStorage.clear();
+                            window.location.reload();
+                        }}
+                        style={{
+                            fontSize: '0.7rem',
+                            border: '1px solid #ff3333',
+                            color: '#ff3333',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            marginTop: '10px',
+                            textAlign: 'center',
+                            width: '100%'
+                        }}
+                    >
+                        ☢ HARD_RESET_SESSION
+                    </button>
                 </div>
             )}
 

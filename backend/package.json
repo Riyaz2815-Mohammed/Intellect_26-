@@ -2,6 +2,7 @@
     "name": "codecrypt-backend",
     "version": "1.0.0",
     "description": "Backend API for CODECRYPT - Intellect '26",
+    "type": "commonjs",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

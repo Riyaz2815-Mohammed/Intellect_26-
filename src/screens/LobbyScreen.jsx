@@ -11,6 +11,10 @@ const LobbyScreen = () => {
                     Welcome, <span style={{ color: 'var(--accent-secondary)' }}>{state.teamName || state.teamId}</span>
                 </h2>
 
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem', letterSpacing: '2px' }}>
+                    CORE MISSIONS COMPLETED: {state.round === 5 ? 4 : Math.max(0, state.roundPath.indexOf(state.round === 0 ? state.roundPath[0] : state.round))} / 4
+                </div>
+
                 <div style={{
                     margin: '2rem auto',
                     padding: '2rem',
@@ -31,7 +35,7 @@ const LobbyScreen = () => {
                 </div>
 
                 <h3 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>
-                    READY FOR ROUND {state.round || 1}
+                    READY FOR {state.round === 5 ? 'THE FINAL RESTORATION' : `ROUND ${state.round || state.roundPath[0]}`}
                 </h3>
 
                 <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
@@ -40,7 +44,7 @@ const LobbyScreen = () => {
 
                 <button
                     className="btn btn-primary"
-                    onClick={() => startRound(state.round || 1, 600)}
+                    onClick={() => startRound(state.round || 0, 600)}
                     style={{ padding: '1.5rem 3rem', fontSize: '1.2rem' }}
                 >
                     🚀 START MISSION

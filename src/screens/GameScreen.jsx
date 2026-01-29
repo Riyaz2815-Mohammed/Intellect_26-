@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { GameService } from '../services/GameService';
 import DragDropSQL from '../components/DragDropSQL';
+import Round5Component from '../components/Round5Component';
 
 // Flash Challenge Component
 const FlashChallengeContent = ({ levelData }) => {
@@ -879,6 +880,136 @@ const GameScreen = () => {
         }
     };
 
+    // --- MISSION BRIEFING LOGIC ---
+    const [showBriefing, setShowBriefing] = useState(false);
+
+    // Reset briefing on new round
+    useEffect(() => {
+        // Only show for Stage 1 of a new round
+        if (state.stage === 1) {
+            setShowBriefing(true);
+        }
+    }, [state.round]); // Only trigger when round changes
+
+    const getBriefingContent = () => {
+        switch (state.round) {
+            case 1: return {
+                title: "DATABASE FOUNDATION",
+                mission: "The system core is unstable. Your first task is to restore basic connectivity.",
+                task: "Correct the syntax of the corrupted SQL queries to re-initialize the database link."
+            };
+            case 2: return {
+                title: "NODE LOGIC TRAVERSAL",
+                mission: "Connectivity is restored, but the logic is flawed. Data is flowing incorrectly.",
+                task: "Identify conceptual errors in the query logic. Ensure the data retrieval paths are valid."
+            };
+            case 3: return {
+                title: "DATA STREAM ANALYSIS",
+                mission: "The stream is volatile. Data fragments appear only for seconds.",
+                task: "Memorize the data tables and reconstruction logs. Validating the integrity of the stream is critical."
+            };
+            case 4: return {
+                title: "PHYSICAL-DIGITAL BRIDGE",
+                mission: "The digital lock requires a physical key. The system has fragmented into the real world.",
+                task: "Analyze the legacy project manifests (Phase 1 & 2) to reveal the location of the physical access code."
+            };
+            case 5: return {
+                title: "CORE SYSTEM RESTORATION",
+                mission: "You have reached the System Core. This is the final barrier.",
+                task: "Unlock the node, recover the data, and make the ultimate decision to save the event."
+            };
+            default: return { title: "UNKNOWN MISSION", mission: "Awaiting instructions...", task: "Stand by." };
+        }
+    };
+
+    const renderBriefing = () => {
+        const content = getBriefingContent();
+        return (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.95)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)'
+            }} className="animate-fade-in">
+                <div style={{
+                    maxWidth: '600px',
+                    width: '90%',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--accent-primary)',
+                    padding: '3rem',
+                    textAlign: 'center',
+                    boxShadow: '0 0 50px rgba(0, 255, 65, 0.2)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    {/* Decorative Elements */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: 'var(--accent-primary)' }}></div>
+                    <div style={{ marginBottom: '2rem', fontSize: '3rem' }}>🛡️</div>
+
+                    <h1 className="glitch" style={{
+                        fontSize: '2rem',
+                        color: 'var(--accent-primary)',
+                        marginBottom: '0.5rem',
+                        letterSpacing: '2px'
+                    }}>
+                        MISSION BRIEFING
+                    </h1>
+                    <h2 style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '2rem', fontFamily: 'var(--font-code)' }}>
+                        // {content.title}
+                    </h2>
+
+                    <div style={{ textAlign: 'left', background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '4px', marginBottom: '2rem' }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                            <strong style={{ color: '#fff' }}>OBJECTIVE:</strong><br />
+                            {content.mission}
+                        </p>
+                        <p style={{ color: 'var(--text-secondary)' }}>
+                            <strong style={{ color: '#fff' }}>DIRECTIVE:</strong><br />
+                            {content.task}
+                        </p>
+                    </div>
+
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => setShowBriefing(false)}
+                        style={{ width: '100%', fontSize: '1.2rem', padding: '1rem' }}
+                    >
+                        INITIATE PROTOCOL
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    if (error) {
+        return (
+            <div className="container" style={{ textAlign: 'center', marginTop: '20vh' }}>
+                <div style={{
+                    color: 'var(--accent-error)',
+                    fontSize: '1.2rem',
+                    border: '1px solid var(--accent-error)',
+                    padding: '2rem',
+                    display: 'inline-block'
+                }}>
+                    <h3>⚠ SYSTEM ERROR</h3>
+                    <p>{error}</p>
+                    <button className="btn btn-outline" onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>
+                        REBOOT TERMINAL
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Show Briefing Overlay if active
+    if (showBriefing && levelData) {
+        return renderBriefing();
+    }
+
     if (!levelData) {
         return (
             <div className="container" style={{ textAlign: 'center', marginTop: '20vh' }}>
@@ -1036,6 +1167,10 @@ const GameScreen = () => {
             );
         }
 
+        if (levelData.type === 'ROUND_5_CORE') {
+            return <Round5Component />;
+        }
+
         if (levelData.type === 'ROUND_COMPLETE') {
             return (
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="animate-fade-in">
@@ -1060,84 +1195,91 @@ const GameScreen = () => {
             <div className="card animate-fade-in">
                 {renderContent()}
 
-                {levelData.type !== 'ROUND_COMPLETE' && levelData.type !== 'SQL_ORDER' && (
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-secondary)' }}>
-                                {levelData.type === 'LOCATION_REVEAL' ? 'ENTER ACCESS CODE_' :
-                                    levelData.type === 'DATA_ANALYSIS' ? 'INPUT ANALYSIS RESULT_' :
-                                        levelData.type === 'FLASH_CHALLENGE' ? 'INPUT YOUR ANSWER_' : 'INPUT CORRECTED QUERY_'}
-                            </label>
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                className="text-code"
-                                autoComplete="off"
-                                style={{
-                                    width: '100%',
-                                    padding: '1rem',
-                                    background: 'var(--bg-primary)',
-                                    border: error ? '1px solid var(--accent-error)' : '1px solid var(--accent-primary)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '1.1rem',
-                                    outline: 'none',
-                                    borderRadius: 'var(--radius-sm)'
-                                }}
-                                autoFocus
-                                placeholder={levelData.placeholder || "Enter code..."}
-                            />
-                        </div>
-
-                        {error && (
-                            <div style={{
-                                color: 'var(--accent-error)',
-                                marginBottom: '1rem',
-                                padding: '0.75rem',
-                                background: 'rgba(255, 51, 51, 0.1)',
-                                borderLeft: '4px solid var(--accent-error)',
-                                fontFamily: 'var(--font-code)',
-                                fontSize: '0.9rem'
-                            }}>
-                                [ERROR]: {error}
+                {![
+                    'ROUND_COMPLETE',
+                    'SQL_ORDER',
+                    'ROUND_5_CORE',
+                    'QUERY_MATCHING',
+                    'QUERY_FIXING',
+                    'SQL_REASONING_MULTI'
+                ].includes(levelData.type) && (
+                        <form onSubmit={handleSubmit}>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-secondary)' }}>
+                                    {levelData.type === 'LOCATION_REVEAL' ? 'ENTER ACCESS CODE_' :
+                                        levelData.type === 'DATA_ANALYSIS' ? 'INPUT ANALYSIS RESULT_' :
+                                            levelData.type === 'FLASH_CHALLENGE' ? 'INPUT YOUR ANSWER_' : 'INPUT CORRECTED QUERY_'}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    className="text-code"
+                                    autoComplete="off"
+                                    style={{
+                                        width: '100%',
+                                        padding: '1rem',
+                                        background: 'var(--bg-primary)',
+                                        border: error ? '1px solid var(--accent-error)' : '1px solid var(--accent-primary)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '1.1rem',
+                                        outline: 'none',
+                                        borderRadius: 'var(--radius-sm)'
+                                    }}
+                                    autoFocus
+                                    placeholder={levelData.placeholder || "Enter code..."}
+                                />
                             </div>
-                        )}
 
-                        {showRetry && (
-                            <div style={{
-                                background: 'rgba(255, 204, 0, 0.1)',
-                                border: '1px solid var(--accent-warning)',
-                                padding: '1rem',
-                                marginBottom: '1rem',
-                                borderRadius: 'var(--radius-md)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}>
-                                <span style={{ color: 'var(--accent-warning)' }}>
-                                    ⚠ Incorrect answer. Try again?
+                            {error && (
+                                <div style={{
+                                    color: 'var(--accent-error)',
+                                    marginBottom: '1rem',
+                                    padding: '0.75rem',
+                                    background: 'rgba(255, 51, 51, 0.1)',
+                                    borderLeft: '4px solid var(--accent-error)',
+                                    fontFamily: 'var(--font-code)',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    [ERROR]: {error}
+                                </div>
+                            )}
+
+                            {showRetry && (
+                                <div style={{
+                                    background: 'rgba(255, 204, 0, 0.1)',
+                                    border: '1px solid var(--accent-warning)',
+                                    padding: '1rem',
+                                    marginBottom: '1rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <span style={{ color: 'var(--accent-warning)' }}>
+                                        ⚠ Incorrect answer. Try again?
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleRetry}
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
+                                    >
+                                        RETRY
+                                    </button>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    {levelData.type === 'SQL_ORDER' ? 'NOTE: ORDER MATTERS' : 'SECURE CHANNEL'}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={handleRetry}
-                                    className="btn btn-outline"
-                                    style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
-                                >
-                                    RETRY
+                                <button type="submit" className="btn btn-primary">
+                                    {levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE'}
                                 </button>
                             </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                {levelData.type === 'SQL_ORDER' ? 'NOTE: ORDER MATTERS' : 'SECURE CHANNEL'}
-                            </span>
-                            <button type="submit" className="btn btn-primary" disabled={timeLeft === 0 && state.roundEndsAt}>
-                                {levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE'}
-                            </button>
-                        </div>
-                    </form>
-                )}
+                        </form>
+                    )}
             </div>
         </div>
     );

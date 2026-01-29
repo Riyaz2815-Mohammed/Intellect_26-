@@ -254,14 +254,10 @@ export const validatePhase2Answers = (answers) => {
 // EMAIL CODE GENERATION
 // ============================================
 
-export const ROUND4_CODE_PREFIX = 'INT26-R4-';
+export const ROUND4_CODE = 'CRPT-8124';
 
-export const generateRound4Code = (teamId) => {
-    const random = Math.floor(1000 + Math.random() * 9000);
-    return `${ROUND4_CODE_PREFIX}${random}`;
-};
 
-export const ROUND4_PLACE = "ADMIN DESK";
+export const ROUND4_PLACE = "Oval";
 
 // Export all tables as a collection for easy rendering
 export const ROUND4_TABLES = {

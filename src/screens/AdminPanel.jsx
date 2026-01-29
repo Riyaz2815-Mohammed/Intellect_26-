@@ -473,11 +473,11 @@ const AdminPanel = () => {
                             <form onSubmit={handleOverrideSubmit}>
                                 <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
                                     <div className="form-group" style={{ flex: '1 1 100px' }}>
-                                        <label>Round (1-4)</label>
+                                        <label>Round (1-10)</label>
                                         <input
                                             type="number"
                                             min="1"
-                                            max="4"
+                                            max="10"
                                             value={overrideData.round}
                                             onChange={(e) => setOverrideData({ ...overrideData, round: e.target.value })}
                                         />
@@ -542,7 +542,22 @@ const AdminPanel = () => {
                                             <td><strong>{team.team_name}</strong></td>
                                             <td>{team.email}</td>
                                             <td><code style={{ color: '#00ff41' }}>{team.login_code}</code></td>
-                                            <td>Round {team.current_round}</td>
+                                            <td>
+                                                {team.current_round === 5 ? (
+                                                    <span style={{
+                                                        background: 'var(--accent-primary)',
+                                                        color: '#000',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '0.8rem'
+                                                    }}>
+                                                        🔥 R5 FINAL
+                                                    </span>
+                                                ) : (
+                                                    `Round ${team.current_round}`
+                                                )}
+                                            </td>
                                             <td>Stage {team.current_stage}</td>
                                             <td className="score">{team.total_score}</td>
                                             <td>

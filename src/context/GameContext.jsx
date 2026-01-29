@@ -117,6 +117,13 @@ export function GameProvider({ children }) {
             if (!parsed.roundPath && parsed.teamId) {
                 parsed.roundPath = getRoundPath(parsed.teamId);
             }
+            // Self-Healing for Round 4 Stage 4 bug (Teams stuck in invalid state)
+            if (parsed.round === 4 && (parsed.stage >= 4 || parsed.stage === 0)) {
+                console.log("Self-healing: Rescuing team from invalid Round 4 state...");
+                parsed.round = 5;
+                parsed.stage = 1;
+                parsed.screen = 'LOBBY';
+            }
             return { ...parsed, error: null };
         }
         return defaultState;
@@ -176,7 +183,7 @@ export function GameProvider({ children }) {
                         round: nextRound,
                         stage: nextStage,
                         score: state.score + pointsToAdd,
-                        screen: nextRound > 4 ? 'LOBBY' : 'GAME',
+                        screen: 'LOBBY', // Always go to lobby between rounds
                         error: null
                     }
                 });
@@ -190,29 +197,26 @@ export function GameProvider({ children }) {
 
             // ROUND 4 SPECIFIC LOGIC
             if (state.round === 4) {
-                if (state.stage === 1 && result.triggerEmail) {
+                // After Phase 2 (Fixing), send email and go to Phase 3 (Code Entry)
+                if (state.stage === 2 && result.triggerEmail) {
                     const emailResult = await EmailService.sendAdvantageCode(state.teamId, state.teamEmail, state.teamName);
                     if (emailResult.success) {
                         dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
                     } else {
-                        dispatch({ type: ACTION.SET_ERROR, payload: 'Email failed.' });
-                        return result;
+                        dispatch({ type: ACTION.SET_ERROR, payload: 'Email failed but proceeding...' });
+                        dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
                     }
                     return result;
                 }
-                if (state.stage === 2) {
-                    const isValid = EmailService.validateCode(state.teamId, answer);
-                    if (isValid) {
-                        return completeRound(200, 'ADVANTAGE CODE VERIFIED');
-                    } else {
-                        dispatch({ type: ACTION.SET_ERROR, payload: 'INVALID CODE' });
-                        return { success: false, message: 'INVALID CODE' };
-                    }
+
+                // After Phase 3 (Code Entry), complete round
+                if (state.stage === 3) {
+                    return completeRound(result.points, 'ADVANTAGE CODE VERIFIED');
                 }
             }
 
             // SPECIAL CHECK FOR ROUND 5 WINNER
-            if (state.round === 5 && state.stage === 10 && result.isWinner) {
+            if (state.round === 5 && result.isWinner) {
                 dispatch({
                     type: ACTION.ADMIN_OVERRIDE, payload: {
                         screen: 'SUCCESS',

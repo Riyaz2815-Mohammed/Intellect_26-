@@ -181,6 +181,34 @@ app.post('/api/teams/register', async (req, res) => {
     }
 });
 
+// --- HELPER: Get Randomized Round Sequence ---
+function getRoundSequence(teamId) {
+    if (!teamId) return [1, 2, 3, 4, 5];
+
+    // Seeded Random Helper
+    let seed = 0;
+    for (let i = 0; i < teamId.length; i++) {
+        seed = ((seed << 5) - seed) + teamId.charCodeAt(i);
+        seed |= 0;
+    }
+    const random = () => {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    };
+
+    // Shuffle 1-4
+    const rounds = [1, 2, 3, 4];
+    for (let i = rounds.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [rounds[i], rounds[j]] = [rounds[j], rounds[i]];
+    }
+
+    // Round 5 is always last
+    rounds.push(5);
+    return rounds;
+}
+
+
 // Get Team State
 app.get('/api/teams/:teamId/state', async (req, res) => {
     try {
@@ -196,10 +224,24 @@ app.get('/api/teams/:teamId/state', async (req, res) => {
         }
 
         const team = teams[0];
+
+        // --- RANDOM ROUND MAPPING ---
+        // team.current_round is the RANK (1st round, 2nd round, etc.)
+        // We map it to the actual Game Round (1=SQL, 2=Data, etc.)
+        const sequence = getRoundSequence(teamId);
+
+        // If rank > 5, they are done (Round 10 logic handled by admin override mainly)
+        // If valid rank (1-5), get mapped round. fallback to 5 if out of bounds.
+        let displayRound = team.current_round;
+        if (team.current_round <= 5) {
+            displayRound = sequence[team.current_round - 1];
+        }
+
         res.json({
-            round: team.current_round,
+            round: displayRound, // Frontend sees the RANDOMIZED round type
             stage: team.current_stage,
-            score: team.total_score
+            score: team.total_score,
+            rank: team.current_round // Useful for frontend to know "Progress: 1/5"
         });
     } catch (error) {
         console.error('Get state error:', error);
@@ -225,6 +267,21 @@ app.post('/api/game/submit', async (req, res) => {
         }
 
         const team = teams[0];
+
+        // --- VALIDATE ROUND MAPPING ---
+        const sequence = getRoundSequence(teamId);
+        const expectedGameRound = sequence[team.current_round - 1];
+
+        // If the submitted round doesn't match the expected game type for this rank
+        // Allowing admin overrides (round > 5) to pass through standard logic if needed, 
+        // but for standard gameplay (1-5), enforce sequence.
+        if (team.current_round <= 5 && parseInt(round) !== expectedGameRound) {
+            console.warn(`[CHEAT DETECTED] Team ${teamId} sent Round ${round} but expected Round ${expectedGameRound} (Rank ${team.current_round})`);
+            // We could reject, but maybe they are submitting a delayed request? 
+            // Let's soft-reject or allow if strict mode is off. 
+            // Currently enforcing STRICT:
+            return res.json({ success: false, message: "INVALID ROUND SESSION" });
+        }
 
         // Calculate Time Taken
         let timeTaken = 0;
@@ -273,48 +330,73 @@ app.post('/api/game/submit', async (req, res) => {
             const newScore = team.total_score + totalPointsAwarded;
 
             // Round Transition Logic
-            const STAGES_PER_ROUND = { 1: 4, 2: 2, 3: 6, 4: 3 };
-            let nextRound = round;
-            let nextStage = stage + 1;
+            // Map GAME TYPE to Total Stages
+            const STAGES_PER_ROUND = {
+                1: 5, // Round 1: 5 Stages
+                2: 5, // Round 2: 5 Stages
+                3: 6, // Round 3: 6 Stages
+                4: 3, // Round 4: 3 Stages
+                5: 1  // Round 5: 1 Stage
+            };
 
-            if (nextStage > (STAGES_PER_ROUND[round] || 5)) {
-                nextRound = round + 1;
+            const gameRound = parseInt(round);
+            const currentStage = parseInt(stage);
+            const maxStages = STAGES_PER_ROUND[gameRound] || 5;
+
+            let nextRank = team.current_round; // Rank
+            let nextStage = currentStage + 1;
+
+            if (currentStage >= maxStages) {
+                // Round Complete! Move to next Rank.
+                nextRank = team.current_round + 1;
                 nextStage = 1;
+                console.log(`[PROGRESS] Team ${teamId} completed Game ${gameRound} (Rank ${team.current_round}). Moving to Rank ${nextRank}.`);
+
+                if (gameRound === 4) {
+                    console.log(`[R4 TRANSITION] Round 4 finished at Stage ${currentStage}. Advancing team.`);
+                }
+            } else {
+                // Update Stage, keep Rank
+                console.log(`[PROGRESS] Team ${teamId} advanced to Game ${gameRound} Stage ${nextStage}.`);
             }
 
+            // Update Team Rank/Stage
+            // Note: We update 'current_round' with nextRank (1,2,3,4,5...)
             await pool.query(
                 'UPDATE teams SET total_score = ?, current_round = ?, current_stage = ? WHERE team_id = ?',
-                [newScore, nextRound, nextStage, teamId]
+                [newScore, nextRank, nextStage, teamId]
             );
 
             // Mark current stage as completed
             await pool.query(
                 'UPDATE team_progress SET status = "completed", completed_at = NOW(), time_taken_seconds = ? WHERE team_id = ? AND round = ? AND stage = ?',
-                [timeTaken, teamId, round, stage]
+                [timeTaken, teamId, gameRound, currentStage]
             );
 
             // Initialize NEXT stage (to start timer)
-            await pool.query(
-                'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
-                [teamId, nextRound, nextStage]
-            );
+            // Determine the Game Round for the NEXT rank if rank changed
+            let nextGameRound = gameRound;
 
-            // Round 4 Phase 2: Send email with advantage code
-            if (round === 4 && stage === 2 && result.triggerEmail) {
-                const code = `INT26-R4-${Math.floor(1000 + Math.random() * 9000)}`;
-
-                // Store code in database
-                await pool.query(
-                    'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 4, ?) ON DUPLICATE KEY UPDATE code = ?, is_used = FALSE',
-                    [teamId, code, code]
-                );
-
-                // Send email
-                await sendAdvantageCodeEmail(team.email, team.team_name, code);
-
-                result.emailSent = true;
-                result.code = code; // For testing/debugging
+            if (nextRank !== team.current_round) {
+                // Calculate what the next game round will be
+                const sequence = getRoundSequence(teamId);
+                if (nextRank <= 5) {
+                    nextGameRound = sequence[nextRank - 1];
+                } else {
+                    nextGameRound = 999; // Finished
+                }
             }
+
+            if (nextGameRound !== 999) {
+                await pool.query(
+                    'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
+                    [teamId, nextGameRound, nextStage]
+                );
+            }
+
+            // Round 4 Phase 2 Completion: NO Email. Just move to Stage 3 (Physical Code Entry).
+            // Logic handled by normal flow.
+
         }
 
         res.json({
@@ -325,6 +407,35 @@ app.post('/api/game/submit', async (req, res) => {
         });
     } catch (error) {
         console.error('Submit error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Trigger Round 5 Email (Called by Frontend Component)
+app.post('/api/game/round5/trigger-email', async (req, res) => {
+    try {
+        const { teamId } = req.body;
+
+        const [teams] = await pool.query('SELECT * FROM teams WHERE team_id = ?', [teamId]);
+        if (teams.length === 0) return res.status(404).json({ error: 'Team not found' });
+        const team = teams[0];
+
+        // Generate Code
+        const code = `INT26-R5-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // Store code in database (Using Round 5 slot)
+        await pool.query(
+            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 5, ?) ON DUPLICATE KEY UPDATE code = ?, is_used = FALSE',
+            [teamId, 5, code, code]
+        );
+
+        // Send email
+        // Using existing email template but tweaked
+        await sendAdvantageCodeEmail(team.email, team.team_name, code, "CRITICAL RESTORATION CODE");
+
+        res.json({ success: true, message: 'Email sent' });
+    } catch (error) {
+        console.error('R5 Email error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -478,13 +589,14 @@ app.post('/api/admin/create-team', async (req, res) => {
             [teamId]
         );
 
-        // Generate physical codes for Round 1 and Round 3
+        // Generate physical codes for Round 1, 3 (Random) and Round 4 (Static)
         const round1Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
         const round3Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+        const round4Code = 'CRPT-8124'; // Static code for everyone
 
         await pool.query(
-            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 1, ?), (?, 3, ?)',
-            [teamId, round1Code, teamId, round3Code]
+            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 1, ?), (?, 3, ?), (?, 4, ?)',
+            [teamId, round1Code, teamId, round3Code, teamId, round4Code]
         );
 
         // Send credentials email
