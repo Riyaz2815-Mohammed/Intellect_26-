@@ -408,10 +408,11 @@ const AdminPanel = () => {
                                     <thead>
                                         <tr>
                                             <th>Team</th>
-                                            <th>Login Code</th>
-                                            <th>Access Code (Round 3)</th>
-                                            <th>Advantage Code (Round 4)</th>
-                                            <th>Physical Code (Round 1)</th>
+                                            <th>Login Credentials</th>
+                                            <th>Round 1 Code</th>
+                                            <th>Round 2 Code</th>
+                                            <th>Round 3 Code</th>
+                                            <th>Round 4 Code</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -419,9 +420,10 @@ const AdminPanel = () => {
                                             <tr key={team.team_id}>
                                                 <td><strong>{team.team_name}</strong></td>
                                                 <td><code style={{ color: '#00ff41', fontSize: '1.1em' }}>{team.login_code}</code></td>
+                                                <td><code style={{ color: '#fff' }}>{team.round1}</code></td>
+                                                <td><code style={{ color: '#aaa' }}>{team.round2 || '-'}</code></td>
                                                 <td><code style={{ color: '#ffcc00' }}>{team.round3}</code></td>
                                                 <td><code style={{ color: '#00ccff' }}>{team.round4}</code></td>
-                                                <td><code style={{ color: '#fff' }}>{team.round1}</code></td>
                                             </tr>
                                         ))}
                                     </tbody>

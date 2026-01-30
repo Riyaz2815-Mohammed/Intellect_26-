@@ -642,9 +642,10 @@ app.get('/api/admin/codes', async (req, res) => {
             const tCodes = physCodes.filter(pc => pc.team_id === t.team_id);
             return {
                 ...t,
+                round1: tCodes.find(c => c.round === 1)?.code || 'N/A',
+                round2: tCodes.find(c => c.round === 2)?.code || 'N/A',
                 round3: tCodes.find(c => c.round === 3)?.code || 'N/A',
-                round4: tCodes.find(c => c.round === 4)?.code || 'N/A',
-                round1: tCodes.find(c => c.round === 1)?.code || 'N/A'
+                round4: tCodes.find(c => c.round === 4)?.code || 'N/A'
             };
         });
 
