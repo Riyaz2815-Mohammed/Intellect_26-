@@ -3,6 +3,8 @@
 
 CodeCrypt is a high-fidelity, cinematic technical event platform designed for Intellect '26. It features a hacker-themed interface, real-time parallel game logic, and a multi-round competitive format ranging from SQL puzzles to physical code retrieval missions.
 
+👉 **[View Deployment Guide](DEPLOY.md)** for Production Setup (Render & Vercel).
+
 ---
 
 ## 🚀 Quick Start (Dev Mode)
@@ -33,6 +35,24 @@ npm run dev
 
 ---
 
+## ⚙️ Game Mechanics
+
+### 🔀 Randomized Round Order
+To prevent cheating and collaboration, the game creates **4 Unique Paths** for teams.
+- Teams play Rounds 1-4 in a scrambled order (e.g., Team A: 1→2→3→4, Team B: 3→4→1→2).
+- The order is determined deterministically by the Team ID hash.
+
+### 📧 Email Integration & Advantage
+- **Round 3**: Completing the Flash memory stage triggers an automated email with a required **Access Code** to finish the round.
+- **Round 4**: Completing Phase 2 triggers an email with an **Advantage Keyword**.
+- **Gatekeeping**: Players CANNOT proceed to the next round until they enter the correct code found in their location or email.
+
+### 🏆 Winning Condition
+- After completing all 4 assigned rounds, the system transitions to the **Mission Accomplished** screen.
+- Final rankings are determined by **Total Score** > **Progress** > **Time Taken**.
+
+---
+
 ## 🎮 Game Structure
 
 ### Round 1: The Fragmentation (SQL Logic)
@@ -55,11 +75,6 @@ npm run dev
 - **Phase 1**: Match Logic (Match Queries to Outputs).
 - **Phase 2**: Fix the System (Repair Broken SQL Queries).
 - **Reward**: Advantage keyword for the final round.
-
-### Round 5: Critical System Failure (Final)
-- **Type**: Parallel Data Recovery
-- **Goal**: Restore unique system nodes (Atlas, Orion, Vega, Nova).
-- **Final**: Physical Run to unique location -> Code Injection -> First Team Wins.
 
 ---
 
@@ -89,7 +104,7 @@ The Admin Panel is the control center for the event.
   - **Winning Page**: View the **Live Leaderboard** instantly via the "🏆 View Leaderboard" button.
 
 ## 🏆 Live Leaderboard
-- **Visibility**: Hidden from players until they complete the game (Round 100).
+- **Visibility**: Visible to all players via the "LEADERBOARD" button in the header.
 - **Admin Access**: Always visible via Admin Panel.
 - **Metrics**: Ranks based on Score, Progress (Round/Stage), and Time Taken.
 

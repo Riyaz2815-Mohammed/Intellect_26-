@@ -12,7 +12,7 @@ const LobbyScreen = () => {
                 </h2>
 
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem', letterSpacing: '2px' }}>
-                    CORE MISSIONS COMPLETED: {state.round === 5 ? 4 : Math.max(0, state.roundPath.indexOf(state.round === 0 ? state.roundPath[0] : state.round))} / 4
+                    CORE MISSIONS COMPLETED: {state.round >= 100 ? 4 : Math.max(0, state.roundPath.indexOf(state.round === 0 ? state.roundPath[0] : state.round))} / 4
                 </div>
 
                 <div style={{ position: 'relative', width: '100px', height: '100px', margin: '2rem auto' }}>
