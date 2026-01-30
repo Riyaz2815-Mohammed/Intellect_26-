@@ -104,12 +104,14 @@ export const GameService = {
                 }
             }
 
-            // Stage 6: Physical code entry
+            // Stage 6: Email Code Entry
             if (stage === 6) {
-                if (input.trim().toUpperCase() === ROUND3_CODE) {
-                    return { success: true, points: 300, message: 'ROUND 3 COMPLETE - FINAL ROUND UNLOCKED' };
+                // Client-side format check (Backend does real validation)
+                const codePattern = /^CRPT-\d{4}$/i;
+                if (codePattern.test(input.trim())) {
+                    return { success: true, points: 200, message: 'ACCESS CODE VERIFIED' };
                 } else {
-                    return { success: false, message: 'INVALID PHYSICAL CODE' };
+                    return { success: false, message: 'INVALID FORMAT: Expected CRPT-XXXX' };
                 }
             }
         }
@@ -178,15 +180,6 @@ export const GameService = {
                 } else {
                     return { success: false, message: 'INVALID FORMAT: Expected CRPT-XXXX' };
                 }
-            }
-        }
-
-        // Round 5 Logic: Final Restoration
-        if (round === 5) {
-            if (input.trim().toUpperCase().startsWith('INT26-R5-') || input.trim().toUpperCase() === 'INT26-WIN') {
-                return { success: true, points: 500, isWinner: true, message: 'SYSTEM RESTORED: PROTOCOL COMPLETE' };
-            } else {
-                return { success: false, message: 'INVALID RESTORATION CODE' };
             }
         }
 
@@ -289,11 +282,11 @@ export const GameService = {
             }
             if (stage === 6) {
                 return {
-                    type: 'LOCATION_REVEAL',
-                    title: 'PHYSICAL RETRIEVAL AUTHORIZED',
-                    content: 'ONE TEAM MEMBER MUST RETRIEVE CODE',
-                    hint: 'Go to location immediately',
-                    location: ROUND3_PLACE
+                    type: 'EMAIL_CODE_ENTRY',
+                    title: 'SYSTEM BREACH DETECTED',
+                    content: 'Access code sent to secure channel (EMAIL).',
+                    hint: 'Check your registered email for the code: CRPT-XXXX',
+                    location: 'INBOX'
                 };
             }
         }
@@ -339,39 +332,7 @@ export const GameService = {
 
         }
 
-        if (round === 5) {
-            // Get Variant based on team ID (Deterministic)
-            // Assuming context passes teamId indirectly or we fetch it. 
-            // For now, let's assume the frontend passes variant or we derive it here.
-            // Since this function signature is (round, stage), we might need another way.
-            // But usually, GameScreen calls this. We can use a randomized or hashed approach
-            // if we don't have the team ID here. 
-            // WAIT: GameContext has state.teamId. GameService doesn't access context directly.
-            // We'll export a helper to get variant.
-            return {
-                type: 'ROUND_5_CORE',
-                title: 'CRITICAL SYSTEM RESTORATION',
-                stage: stage // Pass stage to component to handle internal state
-            };
-        }
-
         return null;
     },
 
-    getRound5Variant: (teamId) => {
-        if (!teamId) return 'A';
-        // Simple hash to map teamId to A, B, C, D
-        const lastChar = teamId.slice(-1);
-        const num = parseInt(lastChar, 10);
-
-        if (isNaN(num)) {
-            // If not a number, map letters
-            const code = lastChar.charCodeAt(0);
-            const variantIndex = code % 4;
-            return ['A', 'B', 'C', 'D'][variantIndex];
-        }
-
-        const variantIndex = num % 4;
-        return ['A', 'B', 'C', 'D'][variantIndex];
-    }
 };

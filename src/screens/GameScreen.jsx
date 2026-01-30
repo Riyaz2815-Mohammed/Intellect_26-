@@ -2,7 +2,105 @@ import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { GameService } from '../services/GameService';
 import DragDropSQL from '../components/DragDropSQL';
-import Round5Component from '../components/Round5Component';
+
+// Video Game Style Win Screen
+const WinScreen = ({ state }) => {
+    return (
+        <div className="animate-fade-in" style={{
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            background: 'radial-gradient(circle at center, #1a1a2e 0%, #000 100%)',
+            color: '#fff',
+            fontFamily: '"Press Start 2P", "Courier New", monospace', // Video game font fallback
+            padding: '2rem',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000
+        }}>
+            <h1 style={{
+                fontSize: '4rem',
+                color: '#00ff41',
+                textShadow: '0 0 20px rgba(0, 255, 65, 0.5), 4px 4px 0px #000',
+                marginBottom: '1rem',
+                letterSpacing: '5px',
+                animation: 'pulse 2s infinite'
+            }}>
+                MISSION ACCOMPLISHED
+            </h1>
+
+            <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '3rem',
+                color: '#aaa',
+                textTransform: 'uppercase'
+            }}>
+                All Systems Restored.
+            </div>
+
+            <div style={{
+                background: 'rgba(0, 50, 0, 0.8)',
+                border: '4px solid #00ff41',
+                padding: '2rem 4rem',
+                borderRadius: '0px', // Retro blocky style
+                boxShadow: '0 0 30px rgba(0, 255, 65, 0.2), inset 0 0 20px rgba(0, 255, 65, 0.1)',
+                marginBottom: '3rem',
+                position: 'relative'
+            }}>
+                <div style={{
+                    position: 'absolute',
+                    top: '-15px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#000',
+                    padding: '0 10px',
+                    color: '#00ff41',
+                    fontSize: '1rem'
+                }}>HIGH SCORE</div>
+
+                <div style={{ fontSize: '5rem', fontWeight: 'bold', textShadow: '4px 4px 0px #003300' }}>
+                    {state.score.toString().padStart(6, '0')}
+                </div>
+            </div>
+
+            <div style={{
+                display: 'flex',
+                gap: '4rem',
+                marginTop: '1rem'
+            }}>
+                <div className="stat-box">
+                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>TEAM</div>
+                    <div style={{ fontSize: '1.5rem', color: '#fff', textShadow: '2px 2px 0px #333' }}>{state.teamName}</div>
+                </div>
+                <div className="stat-box">
+                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>RANK</div>
+                    <div style={{ fontSize: '1.5rem', color: '#FFD700', textShadow: '2px 2px 0px #654321' }}>#1</div>
+                </div>
+            </div>
+
+            <div style={{ marginTop: '5rem', opacity: 0.8, fontSize: '0.9rem', animation: 'blink 1s step-end infinite' }}>
+                PRESS START TO PLAY AGAIN (Just kidding, good job!)
+            </div>
+
+            <style>{`
+                @keyframes pulse {
+                    0% { transform: scale(1); text-shadow: 0 0 20px rgba(0, 255, 65, 0.5); }
+                    50% { transform: scale(1.05); text-shadow: 0 0 30px rgba(0, 255, 65, 0.8); }
+                    100% { transform: scale(1); text-shadow: 0 0 20px rgba(0, 255, 65, 0.5); }
+                }
+                @keyframes blink {
+                    50% { opacity: 0; }
+                }
+            `}</style>
+        </div>
+    );
+};
 
 // Flash Challenge Component
 const FlashChallengeContent = ({ levelData }) => {
@@ -825,15 +923,33 @@ const GameScreen = () => {
     const [input, setInput] = useState('');
     const [levelData, setLevelData] = useState(null);
     const [showRetry, setShowRetry] = useState(false);
+    const [resetKey, setResetKey] = useState(0);
+
+    // --- MISSION BRIEFING LOGIC ---
+    const [showBriefing, setShowBriefing] = useState(false);
+
+    // Reset briefing on new round
+    useEffect(() => {
+        // Only show for Stage 1 of a new round
+        if (state.stage === 1) {
+            setShowBriefing(true);
+        }
+    }, [state.round]); // Only trigger when round changes
 
 
     // Initialize/Update Level Data
     useEffect(() => {
+        if (state.screen === 'SUCCESS') return;
+
         const data = GameService.getStageData(state.round, state.stage);
         setLevelData(data);
         setInput('');
         setShowRetry(false);
-    }, [state.round, state.stage]);
+    }, [state.round, state.stage, state.screen]);
+
+    if (state.screen === 'SUCCESS') {
+        return <WinScreen state={state} />;
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -880,16 +996,7 @@ const GameScreen = () => {
         }
     };
 
-    // --- MISSION BRIEFING LOGIC ---
-    const [showBriefing, setShowBriefing] = useState(false);
 
-    // Reset briefing on new round
-    useEffect(() => {
-        // Only show for Stage 1 of a new round
-        if (state.stage === 1) {
-            setShowBriefing(true);
-        }
-    }, [state.round]); // Only trigger when round changes
 
     const getBriefingContent = () => {
         switch (state.round) {
@@ -1035,7 +1142,39 @@ const GameScreen = () => {
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                         // RECONSTRUCT THE CORRUPTED QUERY FRAGMENTS
                     </p>
+
+                    {error && (
+                        <div className="animate-fade-in" style={{
+                            marginBottom: '1.5rem',
+                            padding: '1rem',
+                            border: '1px solid var(--accent-error)',
+                            background: 'rgba(255, 51, 51, 0.1)',
+                            borderRadius: '4px'
+                        }}>
+                            <div style={{ color: 'var(--accent-error)', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                                ⚠ COMPILATION FAILED
+                            </div>
+                            <div style={{ color: '#fff', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                {error}
+                            </div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '1rem' }}>
+                                // HINT: {levelData.hint}
+                            </div>
+                            <button
+                                className="btn btn-outline"
+                                style={{ borderColor: 'var(--accent-error)', color: 'var(--accent-error)' }}
+                                onClick={() => {
+                                    handleRetry();
+                                    setResetKey(prev => prev + 1);
+                                }}
+                            >
+                                ↺ RESET SEGMENTS
+                            </button>
+                        </div>
+                    )}
+
                     <DragDropSQL
+                        key={resetKey}
                         fragments={levelData.content}
                         onSubmit={handleDragDropSubmit}
                     />
@@ -1167,9 +1306,7 @@ const GameScreen = () => {
             );
         }
 
-        if (levelData.type === 'ROUND_5_CORE') {
-            return <Round5Component />;
-        }
+
 
         if (levelData.type === 'ROUND_COMPLETE') {
             return (
@@ -1187,7 +1324,7 @@ const GameScreen = () => {
                 <div>
                     <h1 style={{ marginBottom: '0.5rem' }}>{levelData.title.toUpperCase()}</h1>
                     <div style={{ display: 'flex', gap: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem', fontFamily: 'var(--font-code)' }}>
-                        <span>ROUND {state.round} // PHASE {state.stage}</span>
+                        <span>PHASE {state.stage}</span>
                     </div>
                 </div>
             </div>
@@ -1198,7 +1335,6 @@ const GameScreen = () => {
                 {![
                     'ROUND_COMPLETE',
                     'SQL_ORDER',
-                    'ROUND_5_CORE',
                     'QUERY_MATCHING',
                     'QUERY_FIXING',
                     'SQL_REASONING_MULTI'
@@ -1224,7 +1360,9 @@ const GameScreen = () => {
                                         color: 'var(--text-primary)',
                                         fontSize: '1.1rem',
                                         outline: 'none',
-                                        borderRadius: 'var(--radius-sm)'
+                                        borderRadius: 'var(--radius-sm)',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: '0 0 10px rgba(0,0,0,0.5)'
                                     }}
                                     autoFocus
                                     placeholder={levelData.placeholder || "Enter code..."}

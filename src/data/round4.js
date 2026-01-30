@@ -41,17 +41,17 @@ export const PHASE1_QUERIES = [
     {
         id: 'Q1',
         label: 'Query A',
-        sql: 'SELECT t.name, COUNT(p.id) as project_count FROM teams t JOIN projects p ON t.id = p.team_id WHERE p.status = "Active" GROUP BY t.name HAVING COUNT(p.id) >= 2'
+        sql: 'SELECT t.name as team_name, t.lead, AVG(p.budget) as avg_budget FROM teams t JOIN projects p ON t.id = p.team_id GROUP BY t.name, t.lead ORDER BY avg_budget DESC LIMIT 1'
     },
     {
         id: 'Q2',
         label: 'Query B',
-        sql: 'SELECT p.name, p.budget FROM projects p WHERE p.priority = "Critical" AND p.budget > 70000 ORDER BY p.budget DESC'
+        sql: 'SELECT t.department, SUM(p.budget) as total_budget FROM teams t JOIN projects p ON t.id = p.team_id WHERE p.status IN ("Active", "On Hold") GROUP BY t.department ORDER BY total_budget DESC'
     },
     {
         id: 'Q3',
         label: 'Query C',
-        sql: 'SELECT t.name as team_name, t.lead, AVG(p.budget) as avg_budget FROM teams t JOIN projects p ON t.id = p.team_id GROUP BY t.name, t.lead ORDER BY avg_budget DESC LIMIT 1'
+        sql: 'SELECT t.name, COUNT(p.id) as project_count FROM teams t JOIN projects p ON t.id = p.team_id WHERE p.status = "Active" GROUP BY t.name HAVING COUNT(p.id) >= 2'
     },
     {
         id: 'Q4',
@@ -61,7 +61,7 @@ export const PHASE1_QUERIES = [
     {
         id: 'Q5',
         label: 'Query E',
-        sql: 'SELECT t.department, SUM(p.budget) as total_budget FROM teams t JOIN projects p ON t.id = p.team_id WHERE p.status IN ("Active", "On Hold") GROUP BY t.department ORDER BY total_budget DESC'
+        sql: 'SELECT p.name, p.budget FROM projects p WHERE p.priority = "Critical" AND p.budget > 70000 ORDER BY p.budget DESC'
     }
 ];
 
@@ -110,13 +110,13 @@ export const PHASE1_OUTPUTS = [
     }
 ];
 
-// Correct mappings: Q1->O1, Q2->O2, Q3->O3, Q4->O4, Q5->O5
+// Correct mappings: Q1->O3, Q2->O5, Q3->O1, Q4->O4, Q5->O2 (User requested 36142 -> 35142)
 export const PHASE1_CORRECT_MAPPING = {
-    'Q1': 'O1',
-    'Q2': 'O2',
-    'Q3': 'O3',
+    'Q1': 'O3',
+    'Q2': 'O5',
+    'Q3': 'O1',
     'Q4': 'O4',
-    'Q5': 'O5'
+    'Q5': 'O2'
 };
 
 export const validatePhase1Matching = (userMapping) => {
@@ -154,67 +154,67 @@ export const validatePhase1Matching = (userMapping) => {
 export const PHASE2_QUESTIONS = [
     {
         id: 1,
-        type: 'INCORRECT_WHERE',
-        title: 'Q1: Incorrect WHERE Logic',
-        brokenQuery: 'SELECT * FROM projects WHERE status = "Active" OR priority = "Critical"',
-        task: 'This query should find projects that are BOTH Active AND Critical priority. What operator should replace OR?',
-        hint: 'Think about logical operators',
-        answer: 'AND',
+        type: 'SIMPLE_LOGIC_ERROR',
+        title: 'Q1: Simple Logic Error',
+        brokenQuery: 'SELECT * FROM projects WHERE priority = "Critical" OR budget > 50000',
+        task: 'This query retrieves projects that are EITHER Critical OR have a high budget. We want projects that satisfy BOTH conditions. Fix the logic.',
+        hint: 'Review your logical operators carefully.',
+        validSQL: 'SELECT * FROM projects WHERE priority = "Critical" AND budget > 50000',
         validateFn: (input) => {
-            const normalized = input.trim().toLowerCase();
-            return normalized === 'and';
+            const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized.includes('priority = "critical"') && normalized.includes('budget > 50000') && normalized.includes('and') && !normalized.includes(' or ');
         }
     },
     {
         id: 2,
-        type: 'WRONG_AGGREGATION',
-        title: 'Q2: Wrong Aggregation Function',
-        brokenQuery: 'SELECT team_id, SUM(budget) FROM projects GROUP BY team_id',
-        task: 'We want the AVERAGE budget per team, not the total. What function should replace SUM?',
-        hint: 'Which function calculates the mean?',
-        answer: 'AVG',
+        type: 'JOIN_SYNTAX_ERROR',
+        title: 'Q2: Missing Join Condition',
+        brokenQuery: 'SELECT p.name, t.title FROM projects p JOIN tasks t',
+        task: 'This query produces a Cartesian product (all combinations). We want to match tasks to their specific projects. Add the missing join condition.',
+        hint: 'Tables must be explicitly linked to avoid Cartesian products.',
+        validSQL: 'SELECT p.name, t.title FROM projects p JOIN tasks t ON p.id = t.project_id',
         validateFn: (input) => {
-            const normalized = input.trim().toLowerCase();
-            return normalized === 'avg' || normalized === 'average';
+            const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized.includes('on p.id = t.project_id') || normalized.includes('on t.project_id = p.id');
         }
     },
     {
         id: 3,
-        type: 'FAULTY_SUBQUERY',
-        title: 'Q3: Faulty Subquery',
-        brokenQuery: 'SELECT name FROM projects WHERE budget > (SELECT budget FROM projects WHERE team_id = "T1")',
-        task: 'The subquery might return multiple rows. What should we add before "budget" in the subquery to make it safe? (We want the maximum)',
-        hint: 'Use an aggregation function',
-        answer: 'MAX',
+        type: 'MISSING_GROUP_BY',
+        title: 'Q3: Aggregate Error',
+        brokenQuery: 'SELECT team_id, COUNT(*) FROM projects',
+        task: 'We want to count the number of projects per team. This query fails because it aggregates everything into one row but asks for team_id. Fix it.',
+        hint: 'Aggregates require defining how rows are bunched together.',
+        validSQL: 'SELECT team_id, COUNT(*) FROM projects GROUP BY team_id',
         validateFn: (input) => {
-            const normalized = input.trim().toLowerCase().replace(/[()]/g, '');
-            return normalized === 'max' || normalized === 'max budget' || normalized.includes('max');
+            const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized.includes('group by team_id') && normalized.includes('count(*)');
         }
     },
     {
         id: 4,
-        type: 'GROUP_BY_HAVING_MISUSE',
-        title: 'Q4: GROUP BY / HAVING Misuse',
-        brokenQuery: 'SELECT team_id, COUNT(*) FROM projects WHERE COUNT(*) > 2 GROUP BY team_id',
-        task: 'You cannot use aggregate functions in WHERE clause. What clause should be used instead for filtering groups?',
-        hint: 'It comes after GROUP BY',
-        answer: 'HAVING',
+        type: 'SUBQUERY_ERROR',
+        title: 'Q4: Multi-Row Subquery',
+        brokenQuery: 'SELECT name FROM projects WHERE budget > (SELECT budget FROM projects WHERE team_id = "T2")',
+        task: 'The subquery returns all budgets for T2 (multiple rows), causing an error. We want projects with a budget higher than the MAXIMUM budget of any T2 project. Fix it.',
+        hint: 'Ensure your subquery returns a single scalar value.',
+        validSQL: 'SELECT name FROM projects WHERE budget > (SELECT MAX(budget) FROM projects WHERE team_id = "T2")',
         validateFn: (input) => {
-            const normalized = input.trim().toLowerCase();
-            return normalized === 'having';
+            const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized.includes('max(budget)') && normalized.includes('team_id = "t2"');
         }
     },
     {
         id: 5,
-        type: 'CONCEPTUAL_LOGIC_FLAW',
-        title: 'Q5: Conceptual Logic Flaw',
-        brokenQuery: 'SELECT * FROM projects WHERE status = "Active" ORDER BY budget LIMIT 1',
-        task: 'This query finds the project with the LOWEST budget among active projects. To find the HIGHEST budget project, what should we add after "budget" in ORDER BY?',
-        hint: 'Think about sort direction',
-        answer: 'DESC',
+        type: 'HAVING_CLAUSE',
+        title: 'Q5: Filtering Aggregates',
+        brokenQuery: 'SELECT team_id, COUNT(*) FROM projects WHERE COUNT(*) > 1 GROUP BY team_id',
+        task: 'You cannot filter aggregate results (like COUNT) using WHERE. Fix the query to show only teams with more than 1 project.',
+        hint: 'Filtering happens at different stages of query execution.',
+        validSQL: 'SELECT team_id, COUNT(*) FROM projects GROUP BY team_id HAVING COUNT(*) > 1',
         validateFn: (input) => {
-            const normalized = input.trim().toLowerCase();
-            return normalized === 'desc' || normalized === 'descending';
+            const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized.includes('having count(*) > 1') && !normalized.includes('where count(*)');
         }
     }
 ];

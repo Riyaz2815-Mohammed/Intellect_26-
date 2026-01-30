@@ -9,7 +9,7 @@ CodeCrypt is a high-fidelity, cinematic technical event platform designed for In
 
 ### 1. Prerequisites
 - Node.js (v18+)
-- MySQL (Optional, for backend)
+- PostgreSQL (Supabase Connection URL)
 
 ### 2. Install & Run
 ```bash
@@ -21,15 +21,15 @@ cd backend && npm install && cd ..
 npm run dev
 # OR start separately:
 # Terminal 1: npm run dev
-# Terminal 2: node backend/server.js
+# Terminal 2: cd backend && npm run dev
 ```
 
 ### 3. Access the App
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Admin Panel**: Login with `admin` / `admin123`
+- **Frontend**: [http://localhost:5173](http://localhost:5173) (or network IP)
+- **Admin Panel**: Login with `admin` / `admin123` via `/admin` route or Lock Button
 - **Player Access**:
-  - **Team A**: User: `CodeWarriors` | Code: `WAR-001`
-  - **Team B**: User: `ByteBusters` | Code: `BYT-002`
+  - Teams are created dynamically via Admin Panel.
+  - Login Code is generated per team.
 
 ---
 
@@ -48,11 +48,12 @@ npm run dev
 ### Round 3: Memory Stream (Flash)
 - **Type**: High-Pressure Flash Memory
 - **Goal**: Memorize disappearing tables/queries and answer in seconds.
-- **Mechanic**: 20s Flash Timer.
+- **Final Stage**: Email Access Code Entry.
 
 ### Round 4: The Advantage (Reasoning)
-- **Type**: Complex SQL Debugging
-- **Goal**: Match queries to outputs and fix broken logic.
+- **Type**: SQL Debugging & Logic
+- **Phase 1**: Match Logic (Match Queries to Outputs).
+- **Phase 2**: Fix the System (Repair Broken SQL Queries).
 - **Reward**: Advantage keyword for the final round.
 
 ### Round 5: Critical System Failure (Final)
@@ -64,26 +65,17 @@ npm run dev
 
 ## 🛠️ Setup Guide
 
-### Backend & Database (MySQL)
-The system uses a local MySQL database for team authentication and state.
-👉 **[Read the Backend Setup Guide](docs/BACKEND_SETUP.md)**
+### Backend & Database (PostgreSQL)
+The system uses a PostgreSQL database (hosted on Supabase) for team authentication, state management, and leaderboards.
+- Connection string is managed in `backend/.env`.
+- Database schema located in `database/supabase_schema.sql`.
 
-## 📊 Database Schema (MySQL)
+---
 
-**Table: `teams`**
-- `id` (INT, PK, Auto Increment)
-- `team_id` (VARCHAR, Unique) - e.g. "TM-101"
-- `team_name` (VARCHAR) - e.g. "CodeWarriors"
-- `email` (VARCHAR)
-- `login_code` (VARCHAR) - Secret for login
-- `access_code` (VARCHAR)
-- `round` (INT) - Current Round (1-5)
-- `stage` (INT) - Current Stage
-- `score` (INT) - Total Points
-- `is_active` (BOOLEAN)
-- `created_at` (TIMESTAMP)
-
-This schema is automatically created by the `backend/schema.sql` file.
+## 📊 Database Features
+- **Teams**: Stores credentials, current progress (Round/Stage), and scores.
+- **Submissions**: Logs every attempt with timestamp, accuracy, and time taken.
+- **Physical Codes**: Manages one-time-use codes for physical challenges.
 
 ---
 
@@ -91,23 +83,28 @@ This schema is automatically created by the `backend/schema.sql` file.
 The Admin Panel is the control center for the event.
 - **Access**: Click the distinct "ADMIN" button in the bottom-right corner.
 - **Features**:
-  - **Live Dashboard**: See current round/stage for all teams.
-  - **Game Control**: Force jump teams to specific rounds (e.g., for testing).
-  - **Emergency Override**: Reset game, unlock stages.
-  - **Logs**: View submission history.
+  - **Team Management**: Create teams, resend credentials, and **permanently delete teams**.
+  - **Live Dashboard**: See real-time activity and submission logs.
+  - **Override System**: Force jump teams to specific rounds/stages.
+  - **Winning Page**: View the **Live Leaderboard** instantly via the "🏆 View Leaderboard" button.
+
+## 🏆 Live Leaderboard
+- **Visibility**: Hidden from players until they complete the game (Round 100).
+- **Admin Access**: Always visible via Admin Panel.
+- **Metrics**: Ranks based on Score, Progress (Round/Stage), and Time Taken.
 
 ---
 
 ## 📂 Project Structure
 ```
 /src
-  /components  # Reusable UI widgets (DragDrop, Terminal, etc.)
+  /components  # Reusable UI widgets
   /context     # Global State (GameContext)
-  /data        # Round-specific Data (Questions, Answers, Variants)
-  /screens     # Main Views (Login, Lobby, Game, Admin)
-  /services    # API Logic (GameService, SupabaseClient)
-/backend       # Express Server (Emails, Auth)
-/docs          # Technical Documentation
+  /data        # Round-specific Data (Questions, Answers)
+  /screens     # Main Views (Login, Lobby, Game, Admin, Leaderboard)
+  /services    # API Logic (GameService)
+/backend       # Express Server (PostgreSQL, Emails, Auth, Leaderboard API)
+/database      # SQL Schemas
 ```
 
 ---

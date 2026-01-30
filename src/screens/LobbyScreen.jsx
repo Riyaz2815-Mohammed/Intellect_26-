@@ -15,28 +15,36 @@ const LobbyScreen = () => {
                     CORE MISSIONS COMPLETED: {state.round === 5 ? 4 : Math.max(0, state.roundPath.indexOf(state.round === 0 ? state.roundPath[0] : state.round))} / 4
                 </div>
 
-                <div style={{
-                    margin: '2rem auto',
-                    padding: '2rem',
-                    border: '1px dashed var(--accent-primary)',
-                    borderRadius: '50%',
-                    width: '100px',
-                    height: '100px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}>
+                <div style={{ position: 'relative', width: '100px', height: '100px', margin: '2rem auto' }}>
+                    <div className="spin-slow" style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        border: '2px dashed var(--accent-primary)',
+                        borderRadius: '50%',
+                        opacity: 0.5
+                    }}></div>
                     <div className="pulse" style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
                         width: '20px',
                         height: '20px',
                         background: 'var(--accent-primary)',
-                        borderRadius: '50%'
+                        borderRadius: '50%',
+                        boxShadow: '0 0 15px var(--accent-primary)'
                     }}></div>
                 </div>
 
                 <h3 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>
-                    READY FOR {state.round === 5 ? 'THE FINAL RESTORATION' : `ROUND ${state.round || state.roundPath[0]}`}
+                    {state.round >= 100 ? 'MISSION ACCOMPLISHED' : 'SYSTEM READY'}
                 </h3>
+                <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', letterSpacing: '0.2em', fontSize: '1rem' }}>
+                    NEXT CHALLENGE LOADING...
+                </h4>
 
                 <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
                     Your system is synchronized and ready for the next challenge.

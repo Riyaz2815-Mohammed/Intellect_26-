@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import './LoginScreen.css';
 
+import { API_BASE_URL } from '../config';
+
 const LoginScreen = ({ onLogin }) => {
     const { login } = useGame();
     const [teamName, setTeamName] = useState('');
@@ -25,7 +27,7 @@ const LoginScreen = ({ onLogin }) => {
             }
 
             // Regular team login
-            const response = await fetch('http://localhost:3001/api/auth/login', {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

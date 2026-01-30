@@ -10,6 +10,7 @@ CREATE TABLE teams (
     team_id VARCHAR(20) UNIQUE NOT NULL,
     team_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
+    login_code VARCHAR(100) NOT NULL,
     access_code VARCHAR(100) NOT NULL,
     current_round INTEGER DEFAULT 1,
     current_stage INTEGER DEFAULT 1,
@@ -40,6 +41,8 @@ CREATE TABLE submissions (
     submitted_answer TEXT,
     is_correct BOOLEAN NOT NULL,
     points_awarded INTEGER DEFAULT 0,
+    time_bonus INTEGER DEFAULT 0,
+    video_time_taken INTEGER DEFAULT 0,
     error_message VARCHAR(255),
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -83,19 +86,18 @@ INSERT INTO event_config (config_key, config_value) VALUES
 ('registration_open', 'true');
 
 -- Sample Teams (for testing)
-INSERT INTO teams (team_id, team_name, email, access_code) VALUES
-('TM-001', 'Code Warriors', 'team1@example.com', 'warrior123'),
-('TM-002', 'Debug Masters', 'team2@example.com', 'debug456'),
-('TM-003', 'SQL Ninjas', 'team3@example.com', 'ninja789');
+INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES
+('TM-001', 'Team Alpha', 'alpha@example.com', 'LOGIN-1111', 'ALPHA-001'),
+('TM-002', 'Team Beta', 'beta@example.com', 'LOGIN-2222', 'BETA-002'),
+('TM-003', 'Team Gamma', 'gamma@example.com', 'LOGIN-3333', 'GAMMA-003'),
+('TM-004', 'Team Delta', 'delta@example.com', 'LOGIN-4444', 'DELTA-004');
 
 -- Sample Physical Codes
 INSERT INTO physical_codes (team_id, round, code) VALUES
-('TM-001', 1, 'CRPT-7712'),
-('TM-001', 3, 'CRPT-9384'),
-('TM-002', 1, 'CRPT-7713'),
-('TM-002', 3, 'CRPT-9385'),
-('TM-003', 1, 'CRPT-7714'),
-('TM-003', 3, 'CRPT-9386');
+('TM-001', 1, 'CRPT-1111'), ('TM-001', 3, 'CRPT-3311'),
+('TM-002', 1, 'CRPT-2222'), ('TM-002', 3, 'CRPT-3322'),
+('TM-003', 1, 'CRPT-3333'), ('TM-003', 3, 'CRPT-3355'),
+('TM-004', 1, 'CRPT-4444'), ('TM-004', 3, 'CRPT-3344');
 
 -- Create Views
 

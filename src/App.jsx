@@ -3,8 +3,10 @@ import { useGame } from './context/GameContext';
 import LoginScreen from './screens/LoginScreen';
 import LobbyScreen from './screens/LobbyScreen';
 import GameScreen from './screens/GameScreen';
+
 import AdminPanel from './screens/AdminPanel';
-import QuickAdmin from './components/QuickAdmin';
+import LeaderboardScreen from './screens/LeaderboardScreen';
+
 
 function App() {
   const { state, logout } = useGame();
@@ -33,6 +35,14 @@ function App() {
   const renderView = () => {
     if (currentView === 'admin') {
       return <AdminPanel />;
+    }
+
+    if (currentView === 'leaderboard') {
+      return (
+        <LeaderboardScreen
+          onBack={() => setCurrentView('game')}
+        />
+      );
     }
 
     if (currentView === 'login' && !state.teamId) {
@@ -79,6 +89,22 @@ function App() {
               <span style={{ margin: '0 0.5rem', color: '#333' }}>|</span>
               SCORE: {state.score}
               <button
+                onClick={() => setCurrentView('leaderboard')}
+                style={{
+                  marginLeft: '1rem',
+                  padding: '2px 8px',
+                  fontSize: '0.75rem',
+                  background: 'rgba(0, 255, 65, 0.1)',
+                  border: '1px solid var(--accent-primary)',
+                  color: 'var(--accent-primary)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-code)'
+                }}
+              >
+                LEADERBOARD
+              </button>
+              <button
                 onClick={() => {
                   if (confirm('Are you sure you want to logout?')) {
                     logout();
@@ -124,7 +150,7 @@ function App() {
   return (
     <>
       {renderView()}
-      <QuickAdmin />
+
     </>
   );
 }

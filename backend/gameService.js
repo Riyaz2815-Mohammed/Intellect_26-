@@ -3,31 +3,28 @@
 // ==================== ROUND 4 DATA ====================
 // Phase 1 Correct Logic
 const PHASE1_CORRECT_MAPPING = {
-    'Q1': 'O1',
-    'Q2': 'O2',
-    'Q3': 'O3',
+    'Q1': 'O3',
+    'Q2': 'O5',
+    'Q3': 'O1',
     'Q4': 'O4',
-    'Q5': 'O5'
+    'Q5': 'O2'
 };
 
 // Phase 2 Correct Answers
 const PHASE2_ANSWERS = [
     { id: 1, answer: 'AND' },
-    { id: 2, answer: 'AVG' },
-    { id: 3, answer: 'MAX' },
-    { id: 4, answer: 'HAVING' },
-    { id: 5, answer: 'DESC' }
+    { id: 2, answer: 'ON' },
+    { id: 3, answer: 'GROUP BY' },
+    { id: 4, answer: 'MAX' },
+    { id: 5, answer: 'HAVING' }
 ];
 
 const validatePhase2Input = (input, expected) => {
-    const normalized = input.trim().toLowerCase().replace(/[()]/g, '');
+    const normalized = input.trim().toLowerCase();
     const exp = expected.toLowerCase();
 
-    if (exp === 'avg') return normalized === 'avg' || normalized === 'average';
-    if (exp === 'max') return normalized === 'max' || normalized.includes('max');
-    if (exp === 'desc') return normalized === 'desc' || normalized === 'descending';
-
-    return normalized === exp;
+    // Check if the expected keyword/correction is present in the full query
+    return normalized.includes(exp);
 };
 
 // ==================== MAIN VALIDATION LOGIC ====================
@@ -58,12 +55,27 @@ const validateSubmission = (round, stage, answer) => {
 
         // Round 3: Analysis
         if (round === 3) {
-            // Simple validation for ease
-            return {
-                success: true,
-                points: 200,
-                message: 'Analysis accepted'
-            };
+            if (stage <= 5) {
+                return {
+                    success: true,
+                    points: 200,
+                    message: 'Analysis accepted',
+                    triggerEmail: stage === 5 // Trigger email on completion of Stage 5
+                };
+            }
+            if (stage === 6) {
+                // Validate code format CRPT-XXXX
+                const codePattern = /^CRPT-\d{4}$/i;
+                if (codePattern.test(answer.trim())) {
+                    return {
+                        success: true,
+                        points: 200,
+                        message: 'Access code verified'
+                    };
+                } else {
+                    return { success: false, message: 'Invalid access code format' };
+                }
+            }
         }
 
         // Round 4: SQL Advantage
@@ -126,8 +138,8 @@ const validateSubmission = (round, stage, answer) => {
 
             // Stage 3: Email Code Entry
             if (stage === 3) {
-                // Validate code format INT26-R4-XXXX
-                const codePattern = /^INT26-R4-\d{4}$/i;
+                // Validate code format CRPT-XXXX
+                const codePattern = /^CRPT-\d{4}$/i;
                 if (codePattern.test(answer.trim())) {
                     return {
                         success: true,

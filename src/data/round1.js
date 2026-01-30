@@ -14,9 +14,9 @@ export const SQL_CHALLENGES = [
     {
         id: 1,
         scrambled: [
-            "FROM", "students",
-            "WHERE", "marks", ">", "80",
-            "SELECT", "name"
+            ">", "marks", "80",
+            "students", "SELECT",
+            "FROM", "name", "WHERE"
         ],
         answer: "SELECT name FROM students WHERE marks > 80",
         hint: "Start with SELECT"
@@ -24,10 +24,10 @@ export const SQL_CHALLENGES = [
     {
         id: 2,
         scrambled: [
-            "ORDER BY", "created_at", "DESC",
-            "SELECT", "*",
-            "FROM", "logs",
-            "WHERE", "status", "=", "'error'"
+            "'error'", "logs", "SELECT",
+            "ORDER BY", "=", "status",
+            "created_at", "WHERE", "*",
+            "FROM", "DESC"
         ],
         answer: "SELECT * FROM logs WHERE status = 'error' ORDER BY created_at DESC",
         hint: "Filter before sorting"
@@ -35,10 +35,10 @@ export const SQL_CHALLENGES = [
     {
         id: 3,
         scrambled: [
-            "GROUP BY", "department",
-            "SELECT", "department,", "COUNT(*)",
-            "FROM", "employees",
-            "HAVING", "COUNT(*)", ">", "5"
+            "HAVING", "COUNT(*)", "employees",
+            "SELECT", "department", ">",
+            "FROM", "department,", "5",
+            "GROUP BY", "COUNT(*)"
         ],
         answer: "SELECT department, COUNT(*) FROM employees GROUP BY department HAVING COUNT(*) > 5",
         hint: "HAVING comes after GROUP BY"
@@ -46,9 +46,9 @@ export const SQL_CHALLENGES = [
     {
         id: 4,
         scrambled: [
-            "JOIN", "orders", "ON", "users.id", "=", "orders.user_id",
-            "SELECT", "users.name,", "orders.amount",
-            "FROM", "users"
+            "JOIN", "orders.amount", "users.name,", "orders.user_id",
+            "SELECT", "=", "users",
+            "FROM", "users.id", "ON","orders"
         ],
         answer: "SELECT users.name, orders.amount FROM users JOIN orders ON users.id = orders.user_id",
         hint: "Standard JOIN syntax"

@@ -75,5 +75,20 @@ export const EmailService = {
      */
     getCodeForTesting(teamId) {
         return localStorage.getItem(`ROUND4_CODE_${teamId}`);
+    },
+
+    /**
+     * Send Round 3 Flash Code (Completion Trophy)
+     */
+    async sendFlashCode(teamId, teamEmail, teamName) {
+        try {
+            const code = `CRPT-COMPLETE-${Math.floor(1000 + Math.random() * 9000)}`;
+            console.log('📧 [FLASH ROUND] EMAIL SENT TO:', teamEmail);
+            console.log('🏆 COMPLETION CODE:', code);
+            return { success: true, code: code };
+        } catch (error) {
+            console.error('Email send error:', error);
+            return { success: false, error: error.message };
+        }
     }
 };

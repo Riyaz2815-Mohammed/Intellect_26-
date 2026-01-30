@@ -62,13 +62,13 @@ CREATE TABLE physical_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     team_id VARCHAR(20) NOT NULL,
     round INT NOT NULL,
-    code VARCHAR(50) NOT NULL UNIQUE,
+    code VARCHAR(50) NOT NULL,
     is_used BOOLEAN DEFAULT FALSE,
     generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     used_at TIMESTAMP NULL,
     FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
-    INDEX idx_code (code),
-    INDEX idx_team_round (team_id, round)
+    UNIQUE KEY unique_team_round (team_id, round),
+    INDEX idx_code (code)
 );
 
 -- Admin Users Table
@@ -99,18 +99,17 @@ INSERT INTO event_config (config_key, config_value) VALUES
 
 -- Sample Teams (for testing)
 INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES
-('TM-001', 'Code Warriors', 'team1@example.com', 'LOGIN-2401', 'warrior123'),
-('TM-002', 'Debug Masters', 'team2@example.com', 'LOGIN-2402', 'debug456'),
-('TM-003', 'SQL Ninjas', 'team3@example.com', 'LOGIN-2403', 'ninja789');
+('TM-001', 'Team Alpha', 'alpha@example.com', 'LOGIN-1111', 'ALPHA-001'),
+('TM-002', 'Team Beta', 'beta@example.com', 'LOGIN-2222', 'BETA-002'),
+('TM-003', 'Team Gamma', 'gamma@example.com', 'LOGIN-3333', 'GAMMA-003'),
+('TM-004', 'Team Delta', 'delta@example.com', 'LOGIN-4444', 'DELTA-004');
 
 -- Sample Physical Codes
 INSERT INTO physical_codes (team_id, round, code) VALUES
-('TM-001', 1, 'CRPT-7712'),
-('TM-001', 3, 'CRPT-9384'),
-('TM-002', 1, 'CRPT-7713'),
-('TM-002', 3, 'CRPT-9385'),
-('TM-003', 1, 'CRPT-7714'),
-('TM-003', 3, 'CRPT-9386');
+('TM-001', 1, 'CRPT-1111'), ('TM-001', 3, 'CRPT-3311'),
+('TM-002', 1, 'CRPT-2222'), ('TM-002', 3, 'CRPT-3322'),
+('TM-003', 1, 'CRPT-3333'), ('TM-003', 3, 'CRPT-3333'),
+('TM-004', 1, 'CRPT-4444'), ('TM-004', 3, 'CRPT-3344');
 
 -- Views for easy querying
 

@@ -1,7 +1,6 @@
 const express = require('express');
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
-const bcrypt = require('bcrypt');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -12,31 +11,28 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'codecrypt',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+// Database Connection (PostgreSQL)
+// Use DATABASE_URL from environment variable
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000 // Timeout after 5s to allow fast retries
 });
 
 // Test database connection on startup
-(async () => {
+// Test database connection on startup with Auto-Retry
+const connectWithRetry = async () => {
     try {
-        const connection = await pool.getConnection();
-        console.log('✅ MySQL Database connected successfully');
-        connection.release();
+        const client = await pool.connect();
+        console.log('✅ PostgreSQL Database connected successfully');
+        client.release();
     } catch (error) {
         console.error('❌ Database connection error:', error.message);
-        if (error.code === 'ER_ACCESS_DENIED_ERROR') {
-            console.error('👉 Tip: Check your DB_PASSWORD in backend/.env');
-        } else if (error.code === 'ER_BAD_DB_ERROR') {
-            console.error('👉 Tip: Database "codecrypt" does not exist. Run Round 1 logic or schema.sql');
-        }
+        console.log('⚠️  Database connection failed (Firewall/Network?). Retrying in 5s...');
+        setTimeout(connectWithRetry, 5000);
     }
-})();
+};
+connectWithRetry();
 
 // Email Transporter (using nodemailer)
 const transporter = nodemailer.createTransport({
@@ -63,7 +59,7 @@ transporter.verify(function (error, success) {
 // Get Global Config
 app.get('/api/config', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT config_key, config_value FROM event_config');
+        const { rows } = await pool.query('SELECT config_key, config_value FROM event_config');
         const config = rows.reduce((acc, row) => {
             acc[row.config_key] = row.config_value;
             return acc;
@@ -79,8 +75,9 @@ app.get('/api/config', async (req, res) => {
 app.post('/api/admin/config', async (req, res) => {
     try {
         const { key, value } = req.body;
+        // Postgres Upsert
         await pool.query(
-            'INSERT INTO event_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = NOW()',
+            'INSERT INTO event_config (config_key, config_value) VALUES ($1, $2) ON CONFLICT (config_key) DO UPDATE SET config_value = $3, updated_at = NOW()',
             [key, value.toString(), value.toString()]
         );
         res.json({ success: true });
@@ -98,8 +95,8 @@ app.post('/api/auth/login', async (req, res) => {
         const { teamName, loginCode } = req.body;
         console.log(`[LOGIN ATTEMPT] Name=${teamName}, Code=${loginCode}`);
 
-        const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE LOWER(team_name) = LOWER(?) AND LOWER(login_code) = LOWER(?)',
+        const { rows: teams } = await pool.query(
+            'SELECT * FROM teams WHERE LOWER(team_name) = LOWER($1) AND LOWER(login_code) = LOWER($2)',
             [teamName.trim(), loginCode.trim()]
         );
 
@@ -143,8 +140,8 @@ app.post('/api/teams/register', async (req, res) => {
         const { teamId, teamName, email, accessCode } = req.body;
 
         // Check if team already exists
-        const [existing] = await pool.query(
-            'SELECT team_id FROM teams WHERE team_id = ? OR email = ?',
+        const { rows: existing } = await pool.query(
+            'SELECT team_id FROM teams WHERE team_id = $1 OR email = $2',
             [teamId, email]
         );
 
@@ -154,7 +151,7 @@ app.post('/api/teams/register', async (req, res) => {
 
         // Insert team
         await pool.query(
-            'INSERT INTO teams (team_id, team_name, email, access_code) VALUES (?, ?, ?, ?)',
+            'INSERT INTO teams (team_id, team_name, email, access_code) VALUES ($1, $2, $3, $4)',
             [teamId, teamName, email, accessCode]
         );
 
@@ -163,7 +160,7 @@ app.post('/api/teams/register', async (req, res) => {
         const round3Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
 
         await pool.query(
-            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 1, ?), (?, 3, ?)',
+            'INSERT INTO physical_codes (team_id, round, code) VALUES ($1, 1, $2), ($3, 3, $4)',
             [teamId, round1Code, teamId, round3Code]
         );
 
@@ -203,8 +200,7 @@ function getRoundSequence(teamId) {
         [rounds[i], rounds[j]] = [rounds[j], rounds[i]];
     }
 
-    // Round 5 is always last
-    rounds.push(5);
+    // Round 5 Removed
     return rounds;
 }
 
@@ -214,8 +210,8 @@ app.get('/api/teams/:teamId/state', async (req, res) => {
     try {
         const { teamId } = req.params;
 
-        const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE team_id = ?',
+        const { rows: teams } = await pool.query(
+            'SELECT * FROM teams WHERE team_id = $1',
             [teamId]
         );
 
@@ -257,8 +253,8 @@ app.post('/api/game/submit', async (req, res) => {
         const { teamId, round, stage, answer } = req.body;
 
         // Get team
-        const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE team_id = ?',
+        const { rows: teams } = await pool.query(
+            'SELECT * FROM teams WHERE team_id = $1',
             [teamId]
         );
 
@@ -288,8 +284,8 @@ app.post('/api/game/submit', async (req, res) => {
         let timeBonus = 0;
 
         // Get start time for this stage
-        const [progress] = await pool.query(
-            'SELECT started_at FROM team_progress WHERE team_id = ? AND round = ? AND stage = ?',
+        const { rows: progress } = await pool.query(
+            'SELECT started_at FROM team_progress WHERE team_id = $1 AND round = $2 AND stage = $3',
             [teamId, round, stage]
         );
 
@@ -306,7 +302,7 @@ app.post('/api/game/submit', async (req, res) => {
         } else {
             // First stage or missing record - Create 'in_progress' record now if missing to start timer for re-attempts
             await pool.query(
-                'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
+                'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES ($1, $2, $3, \'in_progress\', NOW()) ON CONFLICT (team_id, round, stage) DO NOTHING',
                 [teamId, round, stage]
             );
         }
@@ -321,9 +317,31 @@ app.post('/api/game/submit', async (req, res) => {
 
         // Log submission
         await pool.query(
-            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, time_bonus, time_taken_seconds, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, time_bonus, time_taken_seconds, error_message) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [teamId, round, stage, JSON.stringify(answer), result.success, pointsAwarded, timeBonus, timeTaken, result.message]
         );
+
+        if (result.success && result.triggerEmail) {
+            // Fetch Code for this round
+            const targetRound = parseInt(round);
+            const { rows: codes } = await pool.query(
+                'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
+                [teamId, targetRound]
+            );
+
+            if (codes.length > 0) {
+                const code = codes[0].code;
+                console.log(`[EMAIL TRIGGER] Sending email for Round ${targetRound} to ${team.email}`);
+
+                if (targetRound === 3) {
+                    await sendRound3AccessCodeEmail(team.email, team.team_name, code);
+                } else if (targetRound === 4) {
+                    await sendAdvantageCodeEmail(team.email, team.team_name, code);
+                }
+            } else {
+                console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${targetRound}`);
+            }
+        }
 
         if (result.success) {
             // Update team progress
@@ -334,9 +352,8 @@ app.post('/api/game/submit', async (req, res) => {
             const STAGES_PER_ROUND = {
                 1: 5, // Round 1: 5 Stages
                 2: 5, // Round 2: 5 Stages
-                3: 6, // Round 3: 6 Stages
-                4: 3, // Round 4: 3 Stages
-                5: 1  // Round 5: 1 Stage
+                3: 6, // Round 3: 5 Stages + 1 Code Entry (Email)
+                4: 3  // Round 4: 3 Stages
             };
 
             const gameRound = parseInt(round);
@@ -363,13 +380,13 @@ app.post('/api/game/submit', async (req, res) => {
             // Update Team Rank/Stage
             // Note: We update 'current_round' with nextRank (1,2,3,4,5...)
             await pool.query(
-                'UPDATE teams SET total_score = ?, current_round = ?, current_stage = ? WHERE team_id = ?',
+                'UPDATE teams SET total_score = $1, current_round = $2, current_stage = $3 WHERE team_id = $4',
                 [newScore, nextRank, nextStage, teamId]
             );
 
             // Mark current stage as completed
             await pool.query(
-                'UPDATE team_progress SET status = "completed", completed_at = NOW(), time_taken_seconds = ? WHERE team_id = ? AND round = ? AND stage = ?',
+                'UPDATE team_progress SET status = \'completed\', completed_at = NOW(), time_taken_seconds = $1 WHERE team_id = $2 AND round = $3 AND stage = $4',
                 [timeTaken, teamId, gameRound, currentStage]
             );
 
@@ -389,14 +406,10 @@ app.post('/api/game/submit', async (req, res) => {
 
             if (nextGameRound !== 999) {
                 await pool.query(
-                    'INSERT IGNORE INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, ?, ?, "in_progress", NOW())',
+                    'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES ($1, $2, $3, \'in_progress\', NOW()) ON CONFLICT (team_id, round, stage) DO NOTHING',
                     [teamId, nextGameRound, nextStage]
                 );
             }
-
-            // Round 4 Phase 2 Completion: NO Email. Just move to Stage 3 (Physical Code Entry).
-            // Logic handled by normal flow.
-
         }
 
         res.json({
@@ -411,42 +424,15 @@ app.post('/api/game/submit', async (req, res) => {
     }
 });
 
-// Trigger Round 5 Email (Called by Frontend Component)
-app.post('/api/game/round5/trigger-email', async (req, res) => {
-    try {
-        const { teamId } = req.body;
 
-        const [teams] = await pool.query('SELECT * FROM teams WHERE team_id = ?', [teamId]);
-        if (teams.length === 0) return res.status(404).json({ error: 'Team not found' });
-        const team = teams[0];
-
-        // Generate Code
-        const code = `INT26-R5-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        // Store code in database (Using Round 5 slot)
-        await pool.query(
-            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 5, ?) ON DUPLICATE KEY UPDATE code = ?, is_used = FALSE',
-            [teamId, 5, code, code]
-        );
-
-        // Send email
-        // Using existing email template but tweaked
-        await sendAdvantageCodeEmail(team.email, team.team_name, code, "CRITICAL RESTORATION CODE");
-
-        res.json({ success: true, message: 'Email sent' });
-    } catch (error) {
-        console.error('R5 Email error:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
 
 // Get Physical Code
 app.get('/api/game/physical-code/:teamId/:round', async (req, res) => {
     try {
         const { teamId, round } = req.params;
 
-        const [codes] = await pool.query(
-            'SELECT code FROM physical_codes WHERE team_id = ? AND round = ? AND is_used = FALSE',
+        const { rows: codes } = await pool.query(
+            'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2 AND is_used = FALSE',
             [teamId, round]
         );
 
@@ -466,8 +452,8 @@ app.post('/api/game/validate-code', async (req, res) => {
     try {
         const { teamId, round, code } = req.body;
 
-        const [codes] = await pool.query(
-            'SELECT * FROM physical_codes WHERE team_id = ? AND round = ? AND code = ? AND is_used = FALSE',
+        const { rows: codes } = await pool.query(
+            'SELECT * FROM physical_codes WHERE team_id = $1 AND round = $2 AND code = $3 AND is_used = FALSE',
             [teamId, round, code]
         );
 
@@ -477,7 +463,7 @@ app.post('/api/game/validate-code', async (req, res) => {
 
         // Mark as used
         await pool.query(
-            'UPDATE physical_codes SET is_used = TRUE, used_at = NOW() WHERE id = ?',
+            'UPDATE physical_codes SET is_used = TRUE, used_at = NOW() WHERE id = $1',
             [codes[0].id]
         );
 
@@ -490,10 +476,94 @@ app.post('/api/game/validate-code', async (req, res) => {
 
 // ==================== ADMIN ENDPOINTS ====================
 
-// Get Leaderboard
+// Get Leaderboard (Live)
+app.get('/api/leaderboard/live', async (req, res) => {
+    try {
+        // Fetch teams with their raw scores
+        const { rows: teams } = await pool.query(`
+            SELECT 
+                t.team_id, 
+                t.team_name, 
+                t.total_score,
+                t.current_round, -- This is effectively the "Rank/Progress", e.g. 1st round, 2nd round...
+                t.current_stage
+            FROM teams t
+            WHERE t.is_active = TRUE
+        `);
+
+        // Fetch additional stats for tie-breaking or detailed scoring
+        // e.g., Total time taken across all completed stages
+        const { rows: stats } = await pool.query(`
+            SELECT 
+                team_id, 
+                SUM(time_taken_seconds) as total_time,
+                COUNT(CASE WHEN is_correct = FALSE THEN 1 END) as total_retries
+            FROM submissions
+            GROUP BY team_id
+        `);
+
+        // Map stats to teams
+        const statsMap = stats.reduce((acc, row) => {
+            acc[row.team_id] = {
+                totalTime: parseInt(row.total_time) || 0,
+                retries: parseInt(row.total_retries) || 0
+            };
+            return acc;
+        }, {});
+
+        // Construct Leaderboard Data
+        const leaderboard = teams.map(team => {
+            const teamStats = statsMap[team.team_id] || { totalTime: 0, retries: 0 };
+
+            // Calculate a composite score for sorting if scores are equal
+            // Primary: Total Score (Higher is better)
+            // Secondary: Progress (Higher Round/Stage is better)
+            // Tertiary: Time Taken (Lower is better)
+
+            // Note: In our system, 'current_round' is the 'Level' (1-4). 
+            // If they finish, current_round might be > 4 or marked via a flag.
+
+            return {
+                id: team.team_id,
+                name: team.team_name,
+                score: team.total_score,
+                progress: team.current_round, // e.g. 3 means they are on their 3rd assigned round
+                stage: team.current_stage,
+                timeTaken: teamStats.totalTime,
+                retries: teamStats.retries
+            };
+        });
+
+        // Sort Leaderboard
+        leaderboard.sort((a, b) => {
+            // 1. Score (High to Low)
+            if (b.score !== a.score) return b.score - a.score;
+
+            // 2. Progress (High to Low) - Who is further ahead?
+            if (b.progress !== a.progress) return b.progress - a.progress;
+            if (b.stage !== a.stage) return b.stage - a.stage;
+
+            // 3. Time Taken (Low to High) - Faster is better
+            return a.timeTaken - b.timeTaken;
+        });
+
+        // Assign Ranks
+        const rankedLeaderboard = leaderboard.map((team, index) => ({
+            rank: index + 1,
+            ...team
+        }));
+
+        res.json(rankedLeaderboard);
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get Leaderboard (Legacy/Simple)
 app.get('/api/admin/leaderboard', async (req, res) => {
     try {
-        const [leaderboard] = await pool.query('SELECT * FROM leaderboard');
+        const { rows: leaderboard } = await pool.query('SELECT * FROM leaderboard');
         res.json(leaderboard);
     } catch (error) {
         console.error('Leaderboard error:', error);
@@ -504,7 +574,7 @@ app.get('/api/admin/leaderboard', async (req, res) => {
 // Get All Teams
 app.get('/api/admin/teams', async (req, res) => {
     try {
-        const [teams] = await pool.query(
+        const { rows: teams } = await pool.query(
             'SELECT team_id, team_name, email, login_code, current_round, current_stage, total_score, is_active FROM teams ORDER BY total_score DESC'
         );
         res.json(teams);
@@ -517,7 +587,7 @@ app.get('/api/admin/teams', async (req, res) => {
 // Get All Submissions (Admin)
 app.get('/api/admin/submissions', async (req, res) => {
     try {
-        const [submissions] = await pool.query(
+        const { rows: submissions } = await pool.query(
             `SELECT s.*, t.team_name 
              FROM submissions s 
              JOIN teams t ON s.team_id = t.team_id 
@@ -537,7 +607,7 @@ app.post('/api/admin/override', async (req, res) => {
         const { teamId, round, stage, score } = req.body;
 
         await pool.query(
-            'UPDATE teams SET current_round = ?, current_stage = ?, total_score = ? WHERE team_id = ?',
+            'UPDATE teams SET current_round = $1, current_stage = $2, total_score = $3 WHERE team_id = $4',
             [round, stage, score, teamId]
         );
 
@@ -562,8 +632,8 @@ app.post('/api/admin/create-team', async (req, res) => {
         const accessCode = `ACC-${Math.floor(1000 + Math.random() * 9000)}`;
 
         // Check if team name or email already exists
-        const [existing] = await pool.query(
-            'SELECT team_id FROM teams WHERE team_name = ? OR email = ?',
+        const { rows: existing } = await pool.query(
+            'SELECT team_id FROM teams WHERE team_name = $1 OR email = $2',
             [cleanTeamName, email]
         );
 
@@ -577,25 +647,25 @@ app.post('/api/admin/create-team', async (req, res) => {
 
         // Insert team
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
-        const [result] = await pool.query(
-            'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES (?, ?, ?, ?, ?)',
+        const result = await pool.query(
+            'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES ($1, $2, $3, $4, $5)',
             [teamId, cleanTeamName, email, cleanLoginCode, accessCode]
         );
-        console.log(`[CREATE TEAM] Insert result: Affected Rows = ${result.affectedRows}`);
+        // console.log(`[CREATE TEAM] Insert result: Affected Rows = ${result.requestRowcount}`); // pg result structure varies, handled by not crashing
 
         // Start tracking time for Round 1 Stage 1 immediately
         await pool.query(
-            'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES (?, 1, 1, "in_progress", NOW())',
+            'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES ($1, 1, 1, \'in_progress\', NOW())',
             [teamId]
         );
 
         // Generate physical codes for Round 1, 3 (Random) and Round 4 (Static)
         const round1Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
         const round3Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
-        const round4Code = 'CRPT-8124'; // Static code for everyone
+        const round4Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`; // Randomized to avoid DB unique constraint conflict
 
         await pool.query(
-            'INSERT INTO physical_codes (team_id, round, code) VALUES (?, 1, ?), (?, 3, ?), (?, 4, ?)',
+            'INSERT INTO physical_codes (team_id, round, code) VALUES ($1, 1, $2), ($3, 3, $4), ($5, 4, $6)',
             [teamId, round1Code, teamId, round3Code, teamId, round4Code]
         );
 
@@ -622,8 +692,8 @@ app.post('/api/admin/resend-credentials', async (req, res) => {
     try {
         const { teamId } = req.body;
 
-        const [teams] = await pool.query(
-            'SELECT * FROM teams WHERE team_id = ?',
+        const { rows: teams } = await pool.query(
+            'SELECT * FROM teams WHERE team_id = $1',
             [teamId]
         );
 
@@ -650,25 +720,38 @@ app.post('/api/admin/resend-credentials', async (req, res) => {
     }
 });
 
-// Toggle Team Active Status (Admin)
-app.post('/api/admin/toggle-team', async (req, res) => {
+// Delete Team (Admin)
+app.post('/api/admin/delete-team', async (req, res) => {
     try {
-        const { teamId, isActive } = req.body;
+        const { teamId } = req.body;
 
-        await pool.query(
-            'UPDATE teams SET is_active = ? WHERE team_id = ?',
-            [isActive, teamId]
-        );
+        if (!teamId) {
+            return res.status(400).json({ error: 'Team ID is required' });
+        }
+
+        // Perform cascaded deletion manually to be safe (though DB might have cascading FKs, this is explicit)
+        await pool.query('DELETE FROM submissions WHERE team_id = $1', [teamId]);
+        await pool.query('DELETE FROM team_progress WHERE team_id = $1', [teamId]);
+        await pool.query('DELETE FROM physical_codes WHERE team_id = $1', [teamId]);
+
+        // Finally delete the team
+        const result = await pool.query('DELETE FROM teams WHERE team_id = $1 RETURNING team_name', [teamId]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+
+        console.log(`[ADMIN] Team deleted: ${result.rows[0].team_name} (${teamId})`);
 
         res.json({
             success: true,
-            message: `Team ${isActive ? 'activated' : 'deactivated'} successfully`
+            message: `Team ${result.rows[0].team_name} deleted successfully`
         });
     } catch (error) {
-        console.error('Toggle team error:', error);
+        console.error('Delete team error:', error);
         res.status(500).json({
             success: false,
-            error: 'Server error'
+            error: 'Server error during deletion'
         });
     }
 });
@@ -786,6 +869,49 @@ async function sendAdvantageCodeEmail(email, teamName, code) {
     }
 }
 
+async function sendRound3AccessCodeEmail(email, teamName, code) {
+    const mailOptions = {
+        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
+        to: email,
+        subject: `⚠️ SECURITY ALERT: Round 3 Access Code`,
+        html: `
+            <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #000; color: #ff3333; padding: 20px; border: 2px solid #ff3333;">
+                <h1 style="color: #ff3333; text-align: center; text-shadow: 0 0 10px #ff3333;">SYSTEM BREACH DETECTED</h1>
+                <h2 style="text-align: center; color: #fff;">Protocol: EMERGENCY_LOCK</h2>
+                
+                <div style="background: #1a0a0a; padding: 20px; margin: 20px 0; border-left: 4px solid #ff3333;">
+                    <h3 style="color: #fff;">ATTENTION: ${teamName}</h3>
+                    <p>Anomaly detected in Data Stream Analysis. System locked to prevent data corruption.</p>
+                </div>
+                
+                <div style="background: #111; padding: 30px; margin: 20px 0; border: 1px dotted #ff3333; text-align: center;">
+                    <h3 style="color: #fff; margin-bottom: 15px;">🔓 VERIFICATION CODE</h3>
+                    <div style="background: #000; padding: 20px; margin: 15px 0; border: 2px solid #ff3333;">
+                        <p style="font-size: 32px; font-weight: bold; color: #ff3333; letter-spacing: 3px; margin: 0;">
+                            ${code}
+                        </p>
+                    </div>
+                    <p style="color: #999; font-size: 14px; margin-top: 15px;">Enter this code to proceed to the next stage.</p>
+                </div>
+                
+                <p style="text-align: center; margin-top: 30px; font-size: 14px; color: #666;">
+                    Security Subroutine v9.2.1<br>
+                    Automated Alert
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Round 3 Access code email sent to ${email}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Email error:', error);
+        return false;
+    }
+}
+
 async function sendTeamCredentialsEmail(email, teamName, loginCode) {
     const mailOptions = {
         from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
@@ -829,23 +955,10 @@ async function sendTeamCredentialsEmail(email, teamName, loginCode) {
                     </ul>
                 </div>
                 
-                <div style="background: rgba(255, 204, 0, 0.1); padding: 15px; margin: 20px 0; border-left: 4px solid #ffcc00;">
-                    <p style="color: #ffcc00; margin: 0;"><strong>⚠️ IMPORTANT:</strong></p>
-                    <ul style="color: #ffcc00; margin: 10px 0; line-height: 1.6;">
-                        <li>Keep these credentials safe and confidential</li>
-                        <li>You will need both Team Name and Login Code to access the system</li>
-                        <li>Rounds unlock automatically after completion</li>
-                        <li>Your score is based on correctness and speed</li>
-                    </ul>
-                </div>
-                
-                <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #00ffcc;">
-                    🚀 See you at the event!
-                </p>
+                <p style="text-align: center; margin-top: 30px;">⚠️ Keep your credentials safe. You'll need them to login on the event day.</p>
                 
                 <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
-                    This is an automated email from ${process.env.EVENT_NAME}<br>
-                    If you have any questions, contact the admin desk.
+                    This is an automated email. Please do not reply.
                 </p>
             </div>
         `
@@ -853,15 +966,11 @@ async function sendTeamCredentialsEmail(email, teamName, loginCode) {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Team credentials email sent to ${email} for team: ${teamName}`);
-        return true;
+        console.log(`✅ Credentials email sent to ${email}`);
     } catch (error) {
         console.error('❌ Email error:', error);
-        return false;
     }
 }
-
-// ==================== START SERVER ====================
 
 app.listen(PORT, () => {
     console.log(`CODECRYPT Backend running on port ${PORT}`);

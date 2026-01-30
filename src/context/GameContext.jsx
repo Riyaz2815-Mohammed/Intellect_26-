@@ -105,6 +105,7 @@ function gameReducer(state, action) {
 
 import { GameService } from '../services/GameService';
 import { EmailService } from '../services/EmailService';
+import { API_BASE_URL } from '../config';
 
 const GameContext = createContext();
 
@@ -117,12 +118,9 @@ export function GameProvider({ children }) {
             if (!parsed.roundPath && parsed.teamId) {
                 parsed.roundPath = getRoundPath(parsed.teamId);
             }
-            // Self-Healing for Round 4 Stage 4 bug (Teams stuck in invalid state)
-            if (parsed.round === 4 && (parsed.stage >= 4 || parsed.stage === 0)) {
-                console.log("Self-healing: Rescuing team from invalid Round 4 state...");
-                parsed.round = 5;
+            // Self-Healing: Clean up invalid states if necessary
+            if (parsed.stage === 0) {
                 parsed.stage = 1;
-                parsed.screen = 'LOBBY';
             }
             return { ...parsed, error: null };
         }
@@ -160,23 +158,63 @@ export function GameProvider({ children }) {
             // Move to next round in the shuffled path
             return path[currentIndex + 1];
         } else {
-            // Path complete (all 4 done), move to Round 5 (Final)
-            return 5;
+            // Path complete (all 4 done), Game Over / Win State
+            return 100; // 100 = GAME_COMPLETE
         }
     };
 
     const submitAnswer = async (answer) => {
         dispatch({ type: ACTION.SET_ERROR, payload: null });
 
-        const result = GameService.validateSubmission(state.round, state.stage, answer);
+        // 1. Client-Side Validation (Immediate Feedback)
+        const clientResult = GameService.validateSubmission(state.round, state.stage, answer);
+
+        // 2. Send to Backend (Async - fire and forget for speed, or await for sync)
+        // We await here to ensure DB consistency
+        try {
+            if (state.teamId) {
+                // Determine 'round' for backend (Backend expects integer)
+                // Note: Frontend state.round is synced with backend
+                await fetch(`${API_BASE_URL}/game/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        teamId: state.teamId,
+                        round: state.round,
+                        stage: state.stage,
+                        answer: answer
+                    })
+                });
+            }
+        } catch (err) {
+            console.error('Backend submission failed:', err);
+            // We continue with client-side result so game doesn't break offline
+        }
+
+        // 3. Process Result
+        const result = clientResult; // Trust client logic for immediate UI updates
 
         if (result.success) {
             // ROUND COMPLETION HELPER
             const completeRound = (pointsToAdd = 0, msg = null) => {
                 const nextRound = getNextRound(state.round);
                 const nextStage = 1;
-                console.log(`Round ${state.round} Complete. Auto-proceeding to Round ${nextRound}...`);
 
+                if (nextRound === 100) {
+                    console.log('ALL ROUNDS COMPLETE. SHOWING WIN SCREEN.');
+                    dispatch({
+                        type: ACTION.ADMIN_OVERRIDE,
+                        payload: {
+                            screen: 'SUCCESS', // New Win Screen
+                            score: state.score + pointsToAdd,
+                            completionTime: new Date().toISOString(),
+                            isWinner: true
+                        }
+                    });
+                    return { success: true, message: 'MISSION ACCOMPLISHED' };
+                }
+
+                console.log(`Round ${state.round} Complete. Auto-proceeding to Round ${nextRound}...`);
                 dispatch({
                     type: ACTION.ADMIN_OVERRIDE,
                     payload: {
@@ -193,39 +231,33 @@ export function GameProvider({ children }) {
             // CHECK ROUND COMPLETION CONDITIONS
             if (state.round === 1 && state.stage === 5) return completeRound(result.points);
             if (state.round === 2 && state.stage === 5) return completeRound(result.points);
-            if (state.round === 3 && state.stage === 6) return completeRound(result.points);
+
+            // ROUND 3 (FLASH ROUND) LOGIC
+            // Round 3 ends at Stage 5, then email sent, then Stage 6 (Code Entry)
+            if (state.round === 3) {
+                // Note: Backend handles the email sending on submission of Stage 5
+                if (state.stage === 5) {
+                    // Backend sent email. Move to Stage 6.
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                    return { success: true, message: 'FLASH DATA UPLOADED. CHECK SECURE CHANNEL.' };
+                }
+                if (state.stage === 6) {
+                    return completeRound(result.points, 'ACCESS GRANTED');
+                }
+            }
 
             // ROUND 4 SPECIFIC LOGIC
             if (state.round === 4) {
-                // After Phase 2 (Fixing), send email and go to Phase 3 (Code Entry)
-                if (state.stage === 2 && result.triggerEmail) {
-                    const emailResult = await EmailService.sendAdvantageCode(state.teamId, state.teamEmail, state.teamName);
-                    if (emailResult.success) {
-                        dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
-                    } else {
-                        dispatch({ type: ACTION.SET_ERROR, payload: 'Email failed but proceeding...' });
-                        dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
-                    }
-                    return result;
+                // Backend handles email sending for Phase 2
+                if (state.stage === 2) {
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                    return { success: true, message: 'SYSTEM PATCHED. CHECK EMAIL FOR ADVANTAGE KEY.' };
                 }
 
                 // After Phase 3 (Code Entry), complete round
                 if (state.stage === 3) {
                     return completeRound(result.points, 'ADVANTAGE CODE VERIFIED');
                 }
-            }
-
-            // SPECIAL CHECK FOR ROUND 5 WINNER
-            if (state.round === 5 && result.isWinner) {
-                dispatch({
-                    type: ACTION.ADMIN_OVERRIDE, payload: {
-                        screen: 'SUCCESS',
-                        score: state.score + result.points,
-                        completionTime: new Date().toISOString(),
-                        isWinner: true
-                    }
-                });
-                return result;
             }
 
             // Normal Stage Progression
