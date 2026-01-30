@@ -41,17 +41,18 @@ const connectWithRetry = async () => {
 connectWithRetry();
 
 // Email Transporter (Gmail)
-// Use port 465 (SSL) which is more reliable on cloud hosting than 587
+// Switching to built-in 'gmail' service to auto-configure ports/secure settings
+// This handles the 465/587 negotiation automatically.
+console.log(`[EMAIL SETUP] Configuring Gmail Transport for user: ${process.env.SMTP_USER}`);
+
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_SERVER || 'smtp.gmail.com',
-    port: 465, // Force 465 for Production Reliability
-    secure: true, // true for 465, false for other ports
+    service: 'gmail',
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
     },
-    // Add socket timeout to prevent hanging
-    connectionTimeout: 10000
+    // Add socket timeout to prevent hanging, increased to 20s
+    connectionTimeout: 20000
 });
 
 // Test email connection on startup
