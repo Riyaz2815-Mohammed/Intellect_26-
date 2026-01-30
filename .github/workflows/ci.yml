@@ -2,9 +2,9 @@ name: CI/CD Build Check
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "riyaz" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "riyaz" ]
 
 jobs:
   build-frontend:

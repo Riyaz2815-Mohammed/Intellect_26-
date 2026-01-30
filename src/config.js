@@ -4,15 +4,21 @@
 // 2. Window hostname (for local network testing)
 
 const getApiUrl = () => {
-    // If explicitly set in environment (e.g. Production build)
+    // 1. Priority: Environment Variable (Vercel/Production)
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
 
-    // Default to localhost/network for dev
-    // If running on a device (e.g. 192.168.1.5:5173), we assume backend is on same IP :3001
+    // 2. Fallback: Local Development
     const hostname = window.location.hostname;
-    return `http://${hostname}:3001/api`;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+        return `http://${hostname}:3001/api`;
+    }
+
+    // 3. Fallback for deployed frontend without env var (Fail/Default)
+    // This prevents the weird ":3001" logic on Vercel
+    console.error("CRITICAL: VITE_API_URL is missing. Please check Vercel settings.");
+    return 'https://intellect-26-codecrypt.onrender.com/api'; // Hardcoded Safety Net
 };
 
 export const API_BASE_URL = getApiUrl();
