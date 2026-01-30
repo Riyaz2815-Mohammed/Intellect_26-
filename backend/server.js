@@ -41,18 +41,21 @@ const connectWithRetry = async () => {
 connectWithRetry();
 
 // Email Transporter (Gmail)
-// Switching to built-in 'gmail' service to auto-configure ports/secure settings
-// This handles the 465/587 negotiation automatically.
-console.log(`[EMAIL SETUP] Configuring Gmail Transport for user: ${process.env.SMTP_USER}`);
+// Attempting Port 587 with loose TLS settings to bypass network strictness
+console.log(`[EMAIL SETUP] Configuring Gmail Transport (Port 587) for user: ${process.env.SMTP_USER}`);
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // use STARTTLS
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
     },
-    // Add socket timeout to prevent hanging, increased to 20s
-    connectionTimeout: 20000
+    tls: {
+        rejectUnauthorized: false // Bypass SSL strictness which might cause hanging
+    },
+    connectionTimeout: 10000
 });
 
 // Test email connection on startup
@@ -624,6 +627,30 @@ app.post('/api/admin/override', async (req, res) => {
         res.json({ success: true, message: 'Team state updated' });
     } catch (error) {
         console.error('Override error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get All Codes (Admin Fallback for Email Failures)
+app.get('/api/admin/codes', async (req, res) => {
+    try {
+        const { rows: teams } = await pool.query('SELECT team_id, team_name, login_code, access_code FROM teams');
+        const { rows: physCodes } = await pool.query('SELECT team_id, round, code FROM physical_codes');
+
+        // Merge data
+        const codeMap = teams.map(t => {
+            const tCodes = physCodes.filter(pc => pc.team_id === t.team_id);
+            return {
+                ...t,
+                round3: tCodes.find(c => c.round === 3)?.code || 'N/A',
+                round4: tCodes.find(c => c.round === 4)?.code || 'N/A',
+                round1: tCodes.find(c => c.round === 1)?.code || 'N/A'
+            };
+        });
+
+        res.json(codeMap);
+    } catch (error) {
+        console.error('Get codes error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });

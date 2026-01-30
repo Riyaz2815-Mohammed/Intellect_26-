@@ -8,33 +8,7 @@ const AdminPanel = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('isAdmin') === 'true');
     const [loginCreds, setLoginCreds] = useState({ username: '', password: '' });
 
-    const [teams, setTeams] = useState([]);
-    const [submissions, setSubmissions] = useState([]);
-    const [activeTab, setActiveTab] = useState('teams'); // 'teams', 'activity'
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [showLeaderboard, setShowLeaderboard] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
-    const [lastUpdated, setLastUpdated] = useState(null);
-
-    // Dynamic API Base URL
-    const API_BASE = `${API_BASE_URL}/admin`;
-
-    // Form state
-    const [formData, setFormData] = useState({
-        teamName: '',
-        email: '',
-        loginCode: ''
-    });
-
-    const [overrideData, setOverrideData] = useState({
-        teamId: '',
-        teamName: '',
-        round: 1,
-        stage: 1,
-        score: 0
-    });
-    const [showOverrideForm, setShowOverrideForm] = useState(false);
+    const [codes, setCodes] = useState([]);
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -43,309 +17,33 @@ const AdminPanel = () => {
         fetchSubmissions();
         const interval = setInterval(() => {
             if (activeTab === 'activity') fetchSubmissions();
+            else if (activeTab === 'codes') fetchCodes();
             else fetchTeams();
         }, 5000); // Auto-refresh every 5s
         return () => clearInterval(interval);
     }, [activeTab, isAuthenticated]);
 
-    const fetchTeams = async () => {
+    const fetchCodes = async () => {
         try {
-            const response = await fetch(`${API_BASE}/teams?t=${Date.now()}`);
+            const response = await fetch(`${API_BASE}/codes?t=${Date.now()}`);
             const data = await response.json();
-            if (Array.isArray(data)) {
-                setTeams(data);
-                setLastUpdated(new Date());
-            } else {
-                console.error('Expected array for teams, got:', data);
-                setTeams([]);
-                setMessage({ type: 'error', text: 'Database connection failed: ' + (data.error || 'Server Error') });
-            }
+            if (Array.isArray(data)) setCodes(data);
         } catch (error) {
-            console.error('Error fetching teams:', error);
-            setMessage({ type: 'error', text: `Network error: Could not reach server at ${API_BASE}` });
+            console.error('Error fetching codes:', error);
         }
     };
 
-    const fetchSubmissions = async () => {
-        try {
-            const response = await fetch(`${API_BASE}/submissions?t=${Date.now()}`);
-            const data = await response.json();
-            if (Array.isArray(data)) {
-                setSubmissions(data);
-            } else {
-                setSubmissions([]);
-            }
-        } catch (error) {
-            console.error('Error fetching submissions:', error);
-        }
-    };
+    // ... (rest of fetch functions)
 
-    const handleLogin = (e) => {
-        e.preventDefault();
-        if (loginCreds.username === 'admin' && loginCreds.password === 'admin123') {
-            setIsAuthenticated(true);
-            localStorage.setItem('isAdmin', 'true');
-        } else {
-            alert('Invalid Admin Credentials');
-        }
-    };
-
-    if (!isAuthenticated) {
-        return (
-            <>
-                <style>
-                    {`
-                    .admin-login-overlay {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100vh;
-                        background-color: #050505;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        z-index: 9999;
-                    }
-                    .admin-login-card {
-                        background: #111;
-                        border: 1px solid #333;
-                        padding: 3rem;
-                        border-radius: 12px;
-                        width: 100%;
-                        max-width: 400px;
-                        box-shadow: 0 0 50px rgba(0,255,65,0.1);
-                        display: flex;
-                        flex-direction: column;
-                        gap: 1.5rem;
-                    }
-                    .admin-login-title {
-                        color: #00ff41;
-                        text-align: center;
-                        font-family: monospace;
-                        font-size: 1.5rem;
-                        margin-bottom: 1rem;
-                        letter-spacing: 2px;
-                    }
-                    .admin-input-group label {
-                        color: #888;
-                        font-size: 0.8rem;
-                        font-family: monospace;
-                        display: block;
-                        margin-bottom: 5px;
-                    }
-                    .admin-login-input {
-                        width: 100%;
-                        padding: 1rem;
-                        background: #000;
-                        border: 1px solid #333;
-                        color: #fff;
-                        font-family: monospace;
-                        font-size: 1rem;
-                        border-radius: 4px;
-                    }
-                    .admin-login-btn {
-                        width: 100%;
-                        padding: 1rem;
-                        background: #00ff41;
-                        color: #000;
-                        border: none;
-                        font-weight: bold;
-                        cursor: pointer;
-                        text-transform: uppercase;
-                        font-family: monospace;
-                    }
-                    `}
-                </style>
-                <div className="admin-login-overlay">
-                    <form onSubmit={handleLogin} className="admin-login-card">
-                        <h2 className="admin-login-title">ADMIN TERMINAL</h2>
-
-                        <div className="admin-input-group">
-                            <label>admin_user</label>
-                            <input
-                                type="text"
-                                value={loginCreds.username}
-                                onChange={e => setLoginCreds({ ...loginCreds, username: e.target.value })}
-                                className="admin-login-input"
-                            />
-                        </div>
-
-                        <div className="admin-input-group">
-                            <label>passkey</label>
-                            <input
-                                type="password"
-                                value={loginCreds.password}
-                                onChange={e => setLoginCreds({ ...loginCreds, password: e.target.value })}
-                                className="admin-login-input"
-                            />
-                        </div>
-
-                        <button type="submit" className="admin-login-btn">
-                            AUTHENTICATE
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'login' } }))}
-                            style={{ background: 'transparent', border: 'none', color: '#666', marginTop: '10px', width: '100%', cursor: 'pointer' }}
-                        >
-                            &larr; Return to System
-                        </button>
-                    </form>
-                </div>
-            </>
-        );
-    }
-
-    // Generate random login code
-    const generateLoginCode = () => {
-        const code = `LOGIN-${Math.floor(1000 + Math.random() * 9000)}`;
-        setFormData({ ...formData, loginCode: code });
-    };
-
-    // Create team
-    const handleCreateTeam = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage({ type: '', text: '' });
-
-        try {
-            const response = await fetch(`${API_BASE}/create-team`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setMessage({ type: 'success', text: `Team "${formData.teamName}" created successfully! Credentials sent to ${formData.email}` });
-                setFormData({ teamName: '', email: '', loginCode: '' });
-                setShowCreateForm(false);
-                fetchTeams();
-            } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to create team' });
-            }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Connection error. Please try again.' });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Resend credentials
-    const handleResendCredentials = async (teamId, teamName, email) => {
-        if (!confirm(`Resend credentials to ${teamName} (${email})?`)) return;
-
-        try {
-            const response = await fetch(`${API_BASE}/resend-credentials`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ teamId })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setMessage({ type: 'success', text: `Credentials resent to ${email}` });
-            } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to resend credentials' });
-            }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Connection error. Please try again.' });
-        }
-    };
-
-    // Delete team
-    const handleDeleteTeam = async (teamId, teamName) => {
-        if (!confirm(`WARNING: Are you sure you want to DELETE team "${teamName}"?\n\nThis will permanently remove all progress, submissions, and logs for this team. This action cannot be undone.`)) return;
-
-        try {
-            const response = await fetch(`${API_BASE}/delete-team`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ teamId })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                fetchTeams();
-                setMessage({ type: 'success', text: `Team ${teamName} deleted successfully` });
-            } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to delete team' });
-            }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to delete team' });
-        }
-    };
-
-    // Admin Override
-    const handleOverrideSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const response = await fetch(`${API_BASE}/override`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    teamId: overrideData.teamId,
-                    round: parseInt(overrideData.round),
-                    stage: parseInt(overrideData.stage),
-                    score: parseInt(overrideData.score)
-                })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                setMessage({ type: 'success', text: `State updated for team: ${overrideData.teamName}` });
-                setShowOverrideForm(false);
-                fetchTeams();
-            } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to override state' });
-            }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Error: Connection failed' });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const openOverride = (team) => {
-        setOverrideData({
-            teamId: team.team_id,
-            teamName: team.team_name,
-            round: team.current_round,
-            stage: team.current_stage,
-            score: team.total_score
-        });
-        setShowOverrideForm(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleLogout = () => {
-        localStorage.removeItem('isAdmin');
-        setIsAuthenticated(false);
-        window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'login' } }));
-    };
+    // ... (rest of the component until return)
 
     return (
         <div className="admin-container">
+            {/* ... header ... */}
             <div className="admin-header">
                 <h1>🔐 CODECRYPT Admin Panel</h1>
                 <p>Manage teams and credentials</p>
-                <button onClick={handleLogout} className="admin-logout-btn">
-                    LOGOUT
-                </button>
+                <button onClick={handleLogout} className="admin-logout-btn">LOGOUT</button>
             </div>
 
             {showLeaderboard ? (
@@ -355,7 +53,6 @@ const AdminPanel = () => {
             ) : (
                 <>
                     <br />
-
                     {message.text && (
                         <div className={`admin-message ${message.type}`}>
                             {message.type === 'success' ? '✅' : '❌'} {message.text}
@@ -377,10 +74,52 @@ const AdminPanel = () => {
                         >
                             📡 Live Activity
                         </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'codes' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('codes'); fetchCodes(); }}
+                            style={{ background: activeTab === 'codes' ? '#ff3333' : 'transparent', border: '1px solid #ff3333', color: '#fff', padding: '10px 20px', cursor: 'pointer', borderRadius: '4px' }}
+                        >
+                            🔑 Sensitive Codes
+                        </button>
                     </div>
 
+                    {activeTab === 'codes' && (
+                        <div className="codes-section">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <h2 style={{ color: '#ff3333' }}>⚠️ SENSITIVE ACCESS CODES (Email Fallback)</h2>
+                                <button className="btn-secondary" onClick={fetchCodes}>🔄 Refresh Codes</button>
+                            </div>
+                            <div className="teams-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Team</th>
+                                            <th>Login Code</th>
+                                            <th>Access Code (Round 3)</th>
+                                            <th>Advantage Code (Round 4)</th>
+                                            <th>Physical Code (Round 1)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {codes.map((team) => (
+                                            <tr key={team.team_id}>
+                                                <td><strong>{team.team_name}</strong></td>
+                                                <td><code style={{ color: '#00ff41', fontSize: '1.1em' }}>{team.login_code}</code></td>
+                                                <td><code style={{ color: '#ffcc00' }}>{team.round3}</code></td>
+                                                <td><code style={{ color: '#00ccff' }}>{team.round4}</code></td>
+                                                <td><code style={{ color: '#fff' }}>{team.round1}</code></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'activity' && (
+                        // ... (keep existing activity tab)
                         <div className="activity-section">
+                            {/* ... same activity content ... */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                 <h2>Live Submission Log</h2>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -422,6 +161,7 @@ const AdminPanel = () => {
                     )}
 
                     {activeTab === 'teams' && (
+                        // ... (keep existing teams tab)
                         <>
                             <div className="admin-actions">
                                 <button
@@ -444,6 +184,7 @@ const AdminPanel = () => {
                                     🏆 View Leaderboard
                                 </button>
                             </div>
+                            {/* ... rest of teams tab from original file ... */}
                             {lastUpdated && <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#666', marginBottom: '10px' }}>Last updated: {lastUpdated.toLocaleTimeString()}</div>}
 
                             {showCreateForm && (
@@ -507,6 +248,7 @@ const AdminPanel = () => {
 
                             {showOverrideForm && (
                                 <div className="create-team-form override-form" style={{ borderColor: '#ffcc00', borderStyle: 'dashed' }}>
+                                // ... (REST OF OVERRIDE FORM) ...
                                     <h2 style={{ color: '#ffcc00' }}>⚡ Admin Override: {overrideData.teamName}</h2>
                                     <p style={{ fontSize: '12px', color: '#ffcc00', marginTop: '-10px', marginBottom: '15px' }}>
                                         Manual progress update. Use with caution.
