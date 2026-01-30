@@ -10,6 +10,34 @@ const AdminPanel = () => {
 
     const [codes, setCodes] = useState([]);
 
+    const [teams, setTeams] = useState([]);
+    const [submissions, setSubmissions] = useState([]);
+    const [activeTab, setActiveTab] = useState('teams'); // 'teams', 'activity', 'codes'
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState({ type: '', text: '' });
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    // Dynamic API Base URL
+    const API_BASE = `${API_BASE_URL}/admin`;
+
+    // Form state
+    const [formData, setFormData] = useState({
+        teamName: '',
+        email: '',
+        loginCode: ''
+    });
+
+    const [overrideData, setOverrideData] = useState({
+        teamId: '',
+        teamName: '',
+        round: 1,
+        stage: 1,
+        score: 0
+    });
+    const [showOverrideForm, setShowOverrideForm] = useState(false);
+
     useEffect(() => {
         if (!isAuthenticated) return;
 
