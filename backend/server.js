@@ -1,3 +1,9 @@
+const dns = require('dns');
+// Force IPv4 to fix Render/Supabase IPv6 connection issues (ENETUNREACH)
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 const express = require('express');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
@@ -669,8 +675,11 @@ app.post('/api/admin/create-team', async (req, res) => {
             [teamId, round1Code, teamId, round3Code, teamId, round4Code]
         );
 
-        // Send credentials email
-        await sendTeamCredentialsEmail(email, teamName, loginCode);
+        // Send credentials email (Async / Fire-and-Forget)
+        // We do NOT await this so the UI is instant.
+        sendTeamCredentialsEmail(email, teamName, loginCode)
+            .then(() => console.log(`[EMAIL SENT] Credentials sent to ${email}`))
+            .catch(err => console.error(`[EMAIL FAILED] Could not send to ${email}:`, err));
 
         res.json({
             success: true,
