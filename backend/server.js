@@ -100,12 +100,12 @@ app.get('/api/test-email', async (req, res) => {
         });
     }
 
-    const success = await sendViaEmailJS(email, 'Test Email from Debugger', '<h1>It Works!</h1><p>EmailJS is connected.</p>');
+    const result = await sendViaEmailJS(email, 'Test Email from Debugger', '<h1>It Works!</h1><p>EmailJS is connected.</p>');
 
-    if (success) {
+    if (result.success) {
         res.json({ success: true, message: `Email sent to ${email}` });
     } else {
-        res.status(500).json({ success: false, error: 'EmailJS Send Failed. Check server logs for details.' });
+        res.status(500).json({ success: false, error: result.error || 'EmailJS Send Failed. Check server logs for details.' });
     }
 });
 
@@ -891,15 +891,15 @@ async function sendViaEmailJS(toEmail, subject, htmlContent) {
 
         if (response.ok) {
             console.log(`✅ [EMAILJS] Success: ${toEmail}`);
-            return true;
+            return { success: true };
         } else {
             const errText = await response.text();
             console.error(`❌ [EMAILJS] Failed: ${response.status} - ${errText}`);
-            return false;
+            return { success: false, error: `${response.status} - ${errText}` };
         }
     } catch (error) {
         console.error('❌ [EMAILJS] Network Error:', error);
-        return false;
+        return { success: false, error: error.message };
     }
 }
 
