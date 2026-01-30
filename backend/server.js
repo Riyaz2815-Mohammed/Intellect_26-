@@ -702,14 +702,15 @@ app.post('/api/admin/create-team', async (req, res) => {
             [teamId]
         );
 
-        // Generate physical codes for Round 1, 3 (Random) and Round 4 (Static)
+        // Generate physical codes for Round 1, 2, 3, and 4
         const round1Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+        const round2Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
         const round3Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
-        const round4Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`; // Randomized to avoid DB unique constraint conflict
+        const round4Code = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
 
         await pool.query(
-            'INSERT INTO physical_codes (team_id, round, code) VALUES ($1, 1, $2), ($3, 3, $4), ($5, 4, $6)',
-            [teamId, round1Code, teamId, round3Code, teamId, round4Code]
+            'INSERT INTO physical_codes (team_id, round, code) VALUES ($1, 1, $2), ($3, 3, $4), ($5, 4, $6), ($7, 2, $8)',
+            [teamId, round1Code, teamId, round3Code, teamId, round4Code, teamId, round2Code]
         );
 
         // Send credentials email (Async / Fire-and-Forget)
