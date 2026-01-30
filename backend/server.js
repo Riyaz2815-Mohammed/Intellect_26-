@@ -78,6 +78,37 @@ app.post('/api/admin/config', async (req, res) => {
     }
 });
 
+// DEBUG ENDPOINT: Test EmailJS Configuration
+app.get('/api/test-email', async (req, res) => {
+    const email = req.query.email || 'test@example.com';
+    console.log('[DEBUG] Testing EmailJS...');
+
+    // Check Env Vars
+    const envCheck = {
+        service: !!process.env.EMAILJS_SERVICE_ID,
+        template: !!process.env.EMAILJS_TEMPLATE_ID,
+        public: !!process.env.EMAILJS_PUBLIC_KEY,
+        private: !!process.env.EMAILJS_PRIVATE_KEY
+    };
+    console.log('[DEBUG] Env Vars Present:', envCheck);
+
+    if (!envCheck.service || !envCheck.template || !envCheck.public || !envCheck.private) {
+        return res.status(500).json({
+            success: false,
+            error: 'Missing Environment Variables on Server',
+            details: envCheck
+        });
+    }
+
+    const success = await sendViaEmailJS(email, 'Test Email from Debugger', '<h1>It Works!</h1><p>EmailJS is connected.</p>');
+
+    if (success) {
+        res.json({ success: true, message: `Email sent to ${email}` });
+    } else {
+        res.status(500).json({ success: false, error: 'EmailJS Send Failed. Check server logs for details.' });
+    }
+});
+
 // ==================== AUTHENTICATION ====================
 
 // Team Login
