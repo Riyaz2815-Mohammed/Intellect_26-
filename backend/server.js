@@ -41,31 +41,9 @@ const connectWithRetry = async () => {
 connectWithRetry();
 
 // Email Transporter (Gmail)
-// Attempting Port 587 with loose TLS settings to bypass network strictness
-console.log(`[EMAIL SETUP] Configuring Gmail Transport (Port 587) for user: ${process.env.SMTP_USER}`);
-
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // use STARTTLS
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    },
-    tls: {
-        rejectUnauthorized: false // Bypass SSL strictness which might cause hanging
-    },
-    connectionTimeout: 10000
-});
-
-// Test email connection on startup
-transporter.verify(function (error, success) {
-    if (error) {
-        console.error('❌ Email configuration error:', error);
-    } else {
-        console.log('✅ Email server is ready to send messages');
-    }
-});
+// DEPRECATED: Switched to EmailJS (HTTP API)
+// const transporter = nodemailer.createTransport({...});
+console.log('[EMAIL SETUP] Using EmailJS HTTP API for email delivery.');
 
 // ==================== GLOBAL CONFIG ====================
 
@@ -852,171 +830,97 @@ async function sendWelcomeEmail(email, teamName, teamId, accessCode) {
     }
 }
 
-async function sendAdvantageCodeEmail(email, teamName, code) {
-    const mailOptions = {
-        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
-        to: email,
-        subject: `🎯 ADVANTAGE CODE - Round 4 Complete!`,
-        html: `
-            <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
-                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
-                <h2 style="text-align: center; color: #00ffcc;">🎯 ADVANTAGE ROUND COMPLETE</h2>
-                
-                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
-                    <h3 style="color: #00ffcc;">Congratulations, ${teamName}!</h3>
-                    <p>You have successfully completed both phases of Round 4: SQL Advantage Round.</p>
-                    <p style="margin-top: 15px;">✅ Phase 1: Match the Logic - COMPLETE</p>
-                    <p>✅ Phase 2: Fix the System - COMPLETE</p>
-                </div>
-                
-                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%); padding: 30px; margin: 20px 0; border: 2px solid #00ff41; text-align: center;">
-                    <h3 style="color: #00ffcc; margin-bottom: 15px;">🔑 YOUR ADVANTAGE CODE</h3>
-                    <div style="background: #0a0a0a; padding: 20px; margin: 15px 0; border: 1px dashed #00ff41;">
-                        <p style="font-size: 32px; font-weight: bold; color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px #00ff41; margin: 0;">
-                            ${code}
-                        </p>
-                    </div>
-                    <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock the Final Round</p>
-                </div>
-                
-                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
-                    <h3 style="color: #00ffcc;">📍 Backup Location:</h3>
-                    <p>If you didn't receive this email, visit: <strong style="color: #00ff41;">ADMIN DESK</strong></p>
-                    <p style="font-size: 12px; color: #999; margin-top: 10px;">Show this email or your Team ID to get your code.</p>
-                </div>
-                
-                <div style="background: rgba(255, 204, 0, 0.1); padding: 15px; margin: 20px 0; border-left: 4px solid #ffcc00;">
-                    <p style="color: #ffcc00; margin: 0;"><strong>⏰ Next Steps:</strong></p>
-                    <ol style="color: #ffcc00; margin: 10px 0;">
-                        <li>Return to the game platform</li>
-                        <li>Enter your advantage code</li>
-                        <li>Prepare for the Final Round</li>
-                    </ol>
-                </div>
-                
-                <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #00ffcc;">
-                    🚀 Good luck in the Final Round!
-                </p>
-                
-                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
-                    This is an automated email from ${process.env.EVENT_NAME}<br>
-                    Please do not reply to this message.
-                </p>
-            </div>
-        `
+// Email Sender: Switched to EmailJS (HTTP API) to bypass SMTP blocks
+// user needs: EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, EMAILJS_PRIVATE_KEY
+async function sendViaEmailJS(toEmail, subject, htmlContent) {
+    const endpoint = 'https://api.emailjs.com/api/v1.0/email/send';
+
+    // Construct the payload matching EmailJS API
+    const data = {
+        service_id: process.env.EMAILJS_SERVICE_ID,
+        template_id: process.env.EMAILJS_TEMPLATE_ID,
+        user_id: process.env.EMAILJS_PUBLIC_KEY,
+        accessToken: process.env.EMAILJS_PRIVATE_KEY, // Required for server-side auth
+        template_params: {
+            to_email: toEmail,
+            subject: subject,
+            html_content: htmlContent // Requires {{{html_content}}} in your EmailJS Template
+        }
     };
 
     try {
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Advantage code email sent to ${email} with code: ${code}`);
-        return true;
+        console.log(`[EMAILJS] Sending to ${toEmail}...`);
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            console.log(`✅ [EMAILJS] Success: ${toEmail}`);
+            return true;
+        } else {
+            const errText = await response.text();
+            console.error(`❌ [EMAILJS] Failed: ${response.status} - ${errText}`);
+            return false;
+        }
     } catch (error) {
-        console.error('❌ Email error:', error);
+        console.error('❌ [EMAILJS] Network Error:', error);
         return false;
     }
+}
+
+async function sendAdvantageCodeEmail(email, teamName, code) {
+    const subject = `🚀 Final Advantage Code for ${process.env.EVENT_NAME}`;
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 20px; border: 2px solid #00ffcc;">
+                <h2 style="color: #00ffcc; text-align: center;">ADVANTAGE UNLOCKED</h2>
+                <p>Team <strong>${teamName}</strong>,</p>
+                <div style="background: linear-gradient(90deg, #333, #000); padding: 20px; text-align: center; border: 1px solid #ffcc00; margin: 20px 0;">
+                    <h1 style="color: #ffcc00; font-size: 40px; margin: 0; letter-spacing: 5px;">${code}</h1>
+                    <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock the Final Round</p>
+                </div>
+                <p style="color: #999; font-size: 12px; text-align: center;">Sent by System</p>
+            </div>
+    `;
+    return await sendViaEmailJS(email, subject, html);
 }
 
 async function sendRound3AccessCodeEmail(email, teamName, code) {
-    const mailOptions = {
-        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
-        to: email,
-        subject: `⚠️ SECURITY ALERT: Round 3 Access Code`,
-        html: `
+    const subject = `⚠️ SECURITY ALERT: Round 3 Access Code`;
+    const html = `
             <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #000; color: #ff3333; padding: 20px; border: 2px solid #ff3333;">
-                <h1 style="color: #ff3333; text-align: center; text-shadow: 0 0 10px #ff3333;">SYSTEM BREACH DETECTED</h1>
-                <h2 style="text-align: center; color: #fff;">Protocol: EMERGENCY_LOCK</h2>
-                
-                <div style="background: #1a0a0a; padding: 20px; margin: 20px 0; border-left: 4px solid #ff3333;">
-                    <h3 style="color: #fff;">ATTENTION: ${teamName}</h3>
-                    <p>Anomaly detected in Data Stream Analysis. System locked to prevent data corruption.</p>
-                </div>
-                
+                <h1 style="color: #ff3333; text-align: center;">SYSTEM BREACH</h1>
+                <h3 style="color: #fff; text-align: center;">Team: ${teamName}</h3>
                 <div style="background: #111; padding: 30px; margin: 20px 0; border: 1px dotted #ff3333; text-align: center;">
                     <h3 style="color: #fff; margin-bottom: 15px;">🔓 VERIFICATION CODE</h3>
-                    <div style="background: #000; padding: 20px; margin: 15px 0; border: 2px solid #ff3333;">
-                        <p style="font-size: 32px; font-weight: bold; color: #ff3333; letter-spacing: 3px; margin: 0;">
-                            ${code}
-                        </p>
-                    </div>
-                    <p style="color: #999; font-size: 14px; margin-top: 15px;">Enter this code to proceed to the next stage.</p>
+                    <p style="font-size: 32px; font-weight: bold; color: #ff3333; letter-spacing: 3px; margin: 0;">${code}</p>
                 </div>
-                
-                <p style="text-align: center; margin-top: 30px; font-size: 14px; color: #666;">
-                    Security Subroutine v9.2.1<br>
-                    Automated Alert
-                </p>
+                 <p style="color: #666; font-size: 12px; text-align: center;">Security Subroutine v9.2.1</p>
             </div>
-        `
-    };
-
-    try {
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Round 3 Access code email sent to ${email}`);
-        return true;
-    } catch (error) {
-        console.error('❌ Email error:', error);
-        return false;
-    }
+    `;
+    return await sendViaEmailJS(email, subject, html);
 }
 
 async function sendTeamCredentialsEmail(email, teamName, loginCode) {
-    const mailOptions = {
-        from: `"${process.env.EVENT_NAME}" <${process.env.SMTP_FROM_EMAIL}>`,
-        to: email,
-        subject: `🎮 Your CODECRYPT Login Credentials`,
-        html: `
+    const subject = `🎮 Your CODECRYPT Login Credentials`;
+    const html = `
             <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
-                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
-                <h2 style="text-align: center; color: #00ffcc;">🎮 TEAM CREDENTIALS</h2>
-                
+                <h1 style="color: #00ff41; text-align: center;">CODECRYPT</h1>
                 <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
-                    <h3 style="color: #00ffcc;">Welcome to CODECRYPT, ${teamName}!</h3>
-                    <p>Your team has been registered for the event. Use the credentials below to login.</p>
+                    <h3 style="color: #00ffcc;">Welcome, ${teamName}!</h3>
                 </div>
-                
-                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%); padding: 30px; margin: 20px 0; border: 2px solid #00ff41; text-align: center;">
-                    <h3 style="color: #00ffcc; margin-bottom: 15px;">🔐 YOUR LOGIN CREDENTIALS</h3>
-                    
-                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
-                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">TEAM NAME</p>
-                        <p style="font-size: 24px; font-weight: bold; color: #00ff41; letter-spacing: 2px; margin: 5px 0;">
-                            ${teamName}
-                        </p>
-                    </div>
-                    
-                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
-                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">LOGIN CODE</p>
-                        <p style="font-size: 28px; font-weight: bold; color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px #00ff41; margin: 5px 0;">
-                            ${loginCode}
-                        </p>
-                    </div>
+                <div style="border: 2px solid #00ff41; padding: 20px; text-align: center;">
+                    <h3 style="color: #00ffcc; margin-bottom: 5px;">LOGIN CODE</h3>
+                    <p style="font-size: 14px; color: #888; margin-top: 0;">(Use this to log in)</p>
+                    <p style="font-size: 36px; font-weight: bold; color: #fff; background: #003300; padding: 10px; display: inline-block;">${loginCode}</p>
                 </div>
-                
-                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
-                    <h3 style="color: #00ffcc;">📅 Event Details:</h3>
-                    <ul style="line-height: 1.8;">
-                        <li>Event: ${process.env.EVENT_NAME}</li>
-                        <li>Date: ${process.env.EVENT_DATE}</li>
-                        <li>Venue: ${process.env.VENUE}</li>
-                        <li>Platform: <a href="${process.env.FRONTEND_URL}" style="color: #00ffcc;">${process.env.FRONTEND_URL}</a></li>
-                    </ul>
-                </div>
-                
-                <p style="text-align: center; margin-top: 30px;">⚠️ Keep your credentials safe. You'll need them to login on the event day.</p>
-                
-                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
-                    This is an automated email. Please do not reply.
-                </p>
+                <p style="text-align: center; margin-top: 30px; color: #666;">Provide this code to your team members.</p>
             </div>
-        `
-    };
-
-    try {
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Credentials email sent to ${email}`);
-    } catch (error) {
-        console.error('❌ Email error:', error);
-    }
+    `;
+    return await sendViaEmailJS(email, subject, html);
 }
 
 app.listen(PORT, () => {
