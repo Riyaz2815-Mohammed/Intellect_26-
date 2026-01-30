@@ -40,15 +40,18 @@ const connectWithRetry = async () => {
 };
 connectWithRetry();
 
-// Email Transporter (using nodemailer)
+// Email Transporter (Gmail)
+// Use port 465 (SSL) which is more reliable on cloud hosting than 587
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_SERVER || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false, // true for 465, false for other ports
+    port: 465, // Force 465 for Production Reliability
+    secure: true, // true for 465, false for other ports
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-    }
+    },
+    // Add socket timeout to prevent hanging
+    connectionTimeout: 10000
 });
 
 // Test email connection on startup
@@ -637,17 +640,22 @@ app.post('/api/admin/create-team', async (req, res) => {
         const teamId = `TM-${Date.now().toString().slice(-6)}`;
         const accessCode = `ACC-${Math.floor(1000 + Math.random() * 9000)}`;
 
-        // Check if team name or email already exists
+        // Check if team name or email already exists (Case Insensitive)
         const { rows: existing } = await pool.query(
-            'SELECT team_id FROM teams WHERE team_name = $1 OR email = $2',
+            'SELECT team_name, email FROM teams WHERE LOWER(team_name) = LOWER($1) OR email = $2',
             [cleanTeamName, email]
         );
 
         if (existing.length > 0) {
-            console.warn(`[CREATE TEAM] Duplicate found: ${cleanTeamName} or ${email}`);
+            const match = existing[0];
+            let errorMsg = 'Team already exists';
+            if (match.email === email) errorMsg = `Email '${email}' is already in use by another team.`;
+            else errorMsg = `Team name '${cleanTeamName}' is already taken.`;
+
+            console.warn(`[CREATE TEAM] Duplicate: ${errorMsg}`);
             return res.status(400).json({
                 success: false,
-                error: 'Team name or email already exists'
+                error: errorMsg
             });
         }
 
