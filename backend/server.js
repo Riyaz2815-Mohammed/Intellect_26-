@@ -630,7 +630,7 @@ app.get('/api/admin/leaderboard', async (req, res) => {
 app.get('/api/admin/teams', async (req, res) => {
     try {
         const { rows: teams } = await pool.query(
-            'SELECT team_id, team_name, email, login_code, current_round, current_stage, total_score, is_active FROM teams ORDER BY total_score DESC'
+            'SELECT team_id, team_name, email, login_code, current_round, current_stage, total_score, is_active, round_sequence FROM teams ORDER BY total_score DESC'
         );
         res.json(teams);
     } catch (error) {
