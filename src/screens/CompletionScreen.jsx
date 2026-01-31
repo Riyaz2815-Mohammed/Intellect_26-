@@ -19,7 +19,7 @@ const CompletionScreen = () => {
 
     const fetchLeaderboard = async () => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leaderboard`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leaderboard/live`);
             const data = await response.json();
 
             setLeaderboard(data.slice(0, 10)); // Top 10
