@@ -47,8 +47,8 @@ const LoginScreen = ({ onLogin }) => {
                 localStorage.setItem('teamEmail', data.team.email);
                 localStorage.setItem('isAdmin', 'false');
 
-                // Update Context State
-                login(data.team.id, data.team.name, data.team.email);
+                // Update Context State with roundSequence from backend
+                login(data.team.id, data.team.name, data.team.email, data.team.roundSequence);
 
                 // Call parent onLogin
                 onLogin(data.team);

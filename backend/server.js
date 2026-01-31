@@ -45,6 +45,26 @@ connectWithRetry();
 // const transporter = nodemailer.createTransport({...});
 console.log('[EMAIL SETUP] Using EmailJS HTTP API for email delivery.');
 
+// ==================== ROUND SEQUENCE GENERATOR ====================
+
+/**
+ * Generate unique round sequence for each team
+ * Ensures no two teams have the same progression to prevent location overlap
+ */
+function generateRoundSequence(teamId) {
+    // Predefined sequences - each team gets a unique order
+    const sequences = [
+        [1, 2, 3, 4], // Team 1: Normal order
+        [2, 4, 1, 3], // Team 2: Different from all others
+        [3, 1, 4, 2], // Team 3: Different from all others
+        [4, 3, 2, 1]  // Team 4: Reverse order
+    ];
+
+    // Use teamId to assign sequence (teamId 1-4 maps to index 0-3)
+    const index = (teamId - 1) % 4;
+    return sequences[index];
+}
+
 // ==================== GLOBAL CONFIG ====================
 
 // Get Global Config
@@ -142,7 +162,8 @@ app.post('/api/auth/login', async (req, res) => {
                 email: team.email,
                 round: team.current_round,
                 stage: team.current_stage,
-                score: team.total_score
+                score: team.total_score,
+                roundSequence: team.round_sequence || [1, 2, 3, 4]
             }
         });
     } catch (error) {
@@ -344,24 +365,36 @@ app.post('/api/game/submit', async (req, res) => {
         );
 
         if (result.success && result.triggerEmail) {
-            // Fetch Code for this round
-            const targetRound = parseInt(round);
-            const { rows: codes } = await pool.query(
-                'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
-                [teamId, targetRound]
-            );
+            // Email is sent ONLY after completing Round 3 (Memory/Flash round)
+            // This is an advantage for completing the hardest round
+            if (parseInt(round) === 3) {
+                // Get team's round sequence to find next round
+                const { rows: [teamData] } = await pool.query(
+                    'SELECT round_sequence FROM teams WHERE team_id = $1',
+                    [teamId]
+                );
 
-            if (codes.length > 0) {
-                const code = codes[0].code;
-                console.log(`[EMAIL TRIGGER] Sending email for Round ${targetRound} to ${team.email}`);
+                const sequence = teamData.round_sequence || [1, 2, 3, 4];
+                const currentIndex = sequence.indexOf(3); // Round 3 position in sequence
+                const nextRound = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null;
 
-                if (targetRound === 3) {
-                    await sendRound3AccessCodeEmail(team.email, team.team_name, code);
-                } else if (targetRound === 4) {
-                    await sendAdvantageCodeEmail(team.email, team.team_name, code);
+                if (nextRound) {
+                    // Fetch code for next round in sequence
+                    const { rows: codes } = await pool.query(
+                        'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
+                        [teamId, nextRound]
+                    );
+
+                    if (codes.length > 0) {
+                        const code = codes[0].code;
+                        console.log(`[EMAIL ADVANTAGE] Round 3 complete! Sending Round ${nextRound} code to ${team.email}`);
+                        await sendAdvantageCodeEmail(team.email, team.team_name, code, nextRound);
+                    } else {
+                        console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
+                    }
+                } else {
+                    console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
                 }
-            } else {
-                console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${targetRound}`);
             }
         }
 
@@ -697,11 +730,15 @@ app.post('/api/admin/create-team', async (req, res) => {
             });
         }
 
-        // Insert team
+        // Generate unique round sequence for this team
+        const roundSequence = generateRoundSequence(parseInt(teamId));
+        console.log(`[CREATE TEAM] Team ${teamId} assigned sequence: ${roundSequence.join('→')}`);
+
+        // Insert team with round sequence
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
         const result = await pool.query(
-            'INSERT INTO teams (team_id, team_name, email, login_code, access_code) VALUES ($1, $2, $3, $4, $5)',
-            [teamId, cleanTeamName, email, cleanLoginCode, accessCode]
+            'INSERT INTO teams (team_id, team_name, email, login_code, access_code, round_sequence) VALUES ($1, $2, $3, $4, $5, $6)',
+            [teamId, cleanTeamName, email, cleanLoginCode, accessCode, roundSequence]
         );
         // console.log(`[CREATE TEAM] Insert result: Affected Rows = ${result.requestRowcount}`); // pg result structure varies, handled by not crashing
 
@@ -903,17 +940,20 @@ async function sendViaEmailJS(toEmail, subject, htmlContent) {
     }
 }
 
-async function sendAdvantageCodeEmail(email, teamName, code) {
-    const subject = `🚀 Final Advantage Code for ${process.env.EVENT_NAME}`;
+async function sendAdvantageCodeEmail(email, teamName, code, roundNumber = 4) {
+    const subject = `🎁 ADVANTAGE CODE - Round ${roundNumber} Access`;
     const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 20px; border: 2px solid #00ffcc;">
-                <h2 style="color: #00ffcc; text-align: center;">ADVANTAGE UNLOCKED</h2>
+                <h2 style="color: #00ffcc; text-align: center;">🏆 ADVANTAGE UNLOCKED</h2>
                 <p>Team <strong>${teamName}</strong>,</p>
+                <p style="color: #ffcc00;">Congratulations! You completed the Memory Analysis round (Round 3)!</p>
+                <p>As a reward for conquering the hardest challenge, here's your code for <strong>Round ${roundNumber}</strong>:</p>
                 <div style="background: linear-gradient(90deg, #333, #000); padding: 20px; text-align: center; border: 1px solid #ffcc00; margin: 20px 0;">
                     <h1 style="color: #ffcc00; font-size: 40px; margin: 0; letter-spacing: 5px;">${code}</h1>
-                    <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock the Final Round</p>
+                    <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock Round ${roundNumber}</p>
                 </div>
-                <p style="color: #999; font-size: 12px; text-align: center;">Sent by System</p>
+                <p style="color: #00ffcc;">No need to visit a physical location - you've earned this advantage!</p>
+                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">Sent by CODECRYPT System</p>
             </div>
     `;
     return await sendViaEmailJS(email, subject, html);
@@ -939,16 +979,46 @@ async function sendTeamCredentialsEmail(email, teamName, loginCode) {
     const subject = `🎮 Your CODECRYPT Login Credentials`;
     const html = `
             <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #00ff41; padding: 20px; border: 2px solid #00ff41;">
-                <h1 style="color: #00ff41; text-align: center;">CODECRYPT</h1>
+                <h1 style="color: #00ff41; text-align: center; text-shadow: 0 0 10px #00ff41;">CODECRYPT</h1>
+                <h2 style="text-align: center; color: #00ffcc;">🎮 TEAM CREDENTIALS</h2>
+                
                 <div style="background: #1a1a1a; padding: 20px; margin: 20px 0; border-left: 4px solid #00ff41;">
-                    <h3 style="color: #00ffcc;">Welcome, ${teamName}!</h3>
+                    <h3 style="color: #00ffcc;">Welcome to CODECRYPT, ${teamName}!</h3>
+                    <p>Your team has been registered for the event. Use the credentials below to login.</p>
                 </div>
-                <div style="border: 2px solid #00ff41; padding: 20px; text-align: center;">
-                    <h3 style="color: #00ffcc; margin-bottom: 5px;">LOGIN CODE</h3>
-                    <p style="font-size: 14px; color: #888; margin-top: 0;">(Use this to log in)</p>
-                    <p style="font-size: 36px; font-weight: bold; color: #fff; background: #003300; padding: 10px; display: inline-block;">${loginCode}</p>
+                
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%); padding: 30px; margin: 20px 0; border: 2px solid #00ff41; text-align: center;">
+                    <h3 style="color: #00ffcc; margin-bottom: 15px;">🔐 YOUR LOGIN CREDENTIALS</h3>
+                    
+                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
+                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">TEAM NAME</p>
+                        <p style="font-size: 24px; font-weight: bold; color: #00ff41; letter-spacing: 2px; margin: 5px 0;">
+                            ${teamName}
+                        </p>
+                    </div>
+                    
+                    <div style="background: #0a0a0a; padding: 15px; margin: 15px 0; border: 1px dashed #00ff41;">
+                        <p style="color: #00ffcc; margin: 5px 0; font-size: 14px;">LOGIN CODE</p>
+                        <p style="font-size: 28px; font-weight: bold; color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px #00ff41; margin: 5px 0;">
+                            ${loginCode}
+                        </p>
+                    </div>
                 </div>
-                <p style="text-align: center; margin-top: 30px; color: #666;">Provide this code to your team members.</p>
+                
+                <div style="background: #1a1a1a; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #00ffcc;">📅 Event Details:</h3>
+                    <ul style="line-height: 1.8;">
+                        <li>Event: ${process.env.EVENT_NAME}</li>
+                        <li>Date: ${process.env.EVENT_DATE}</li>
+                        <li>Platform: <a href="https://intellect26-codecrypt.vercel.app/" style="color: #00ffcc;">https://intellect26-codecrypt.vercel.app/</a></li>
+                    </ul>
+                </div>
+                
+                <p style="text-align: center; margin-top: 30px;">⚠️ Keep your credentials safe. You'll need them to login on the event day.</p>
+                
+                <p style="color: #666; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                    This is an automated email. Please do not reply.
+                </p>
             </div>
     `;
     return await sendViaEmailJS(email, subject, html);

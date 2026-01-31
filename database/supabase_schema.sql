@@ -15,6 +15,7 @@ CREATE TABLE teams (
     current_round INTEGER DEFAULT 1,
     current_stage INTEGER DEFAULT 1,
     total_score INTEGER DEFAULT 0,
+    round_sequence INTEGER[] DEFAULT ARRAY[1,2,3,4],
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

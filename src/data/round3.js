@@ -23,7 +23,7 @@ export const ROUND3_QUESTIONS = [
     {
         id: 1,
         type: 'TABLE_FLASH',
-        flashDuration: 20,
+        flashDuration: 30,
         flashData: EVENTS_TABLE,
         prompt: "Root Cause Analysis: Which event triggered the system crash, and what was the primary indicator? (Format: Name - Indicator)",
         hint: "Look for CRASHED status and extreme metrics",
@@ -39,7 +39,7 @@ export const ROUND3_QUESTIONS = [
         // subquery
         id: 2,
         type: 'QUERY_FLASH',
-        flashDuration: 20,
+        flashDuration: 30,
         flashData: FLASH_QUERY,
         prompt: "Forensic Reconstruction: Re-type the efficiency analysis query EXACTLY.",
         hint: "SELECT name, efficiency calculation...",
@@ -48,7 +48,7 @@ export const ROUND3_QUESTIONS = [
     {
         id: 3,
         type: 'TABLE_FLASH',
-        flashDuration: 15,
+        flashDuration: 30,
         flashData: EVENTS_TABLE,
         prompt: "Quick Audit: What is the status corresponds to the 'CyberWall' event?",
         hint: "Memorize the ID column",
@@ -60,7 +60,7 @@ export const ROUND3_QUESTIONS = [
     {
         id: 4,
         type: 'LOGICAL_DECISION',
-        flashDuration: 15,
+        flashDuration: 30,
         flashData: EVENTS_TABLE,
         hint: "Give the reason in simple words",
         prompt: "Why did LogicLoop event has a status warning?",
@@ -73,7 +73,7 @@ export const ROUND3_QUESTIONS = [
     {
         id: 5,
         type: 'TABLE_QUERY_FLASH',
-        flashDuration: 15,
+        flashDuration: 30,
         flashData: 'SELECT name FROM events WHERE (status = "CRITICAL" OR status = "CRASHED") AND cpu_load > 75 and users < 300 ',
         tableData: EVENTS_TABLE,
         prompt: "Execute the query mentally and provide the result (event names in correct order).",

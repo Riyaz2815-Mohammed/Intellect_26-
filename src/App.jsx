@@ -3,6 +3,7 @@ import { useGame } from './context/GameContext';
 import LoginScreen from './screens/LoginScreen';
 import LobbyScreen from './screens/LobbyScreen';
 import GameScreen from './screens/GameScreen';
+import CompletionScreen from './screens/CompletionScreen';
 
 import AdminPanel from './screens/AdminPanel';
 import LeaderboardScreen from './screens/LeaderboardScreen';
@@ -57,6 +58,9 @@ function App() {
         break;
       case 'GAME':
         ScreenComponent = GameScreen;
+        break;
+      case 'SUCCESS':
+        ScreenComponent = CompletionScreen;
         break;
       default:
         ScreenComponent = GameScreen;

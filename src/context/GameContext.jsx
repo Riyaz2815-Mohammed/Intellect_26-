@@ -26,7 +26,7 @@ const initialState = {
     score: 0,
     lastSubmission: null,
     error: null,
-    roundPath: getRoundPath(localStorage.getItem('teamId')), // Restore path
+    roundSequence: JSON.parse(localStorage.getItem('roundSequence') || '[1,2,3,4]'), // Team-specific sequence from backend
 };
 
 // Actions
@@ -37,25 +37,29 @@ const ACTION = {
     NEXT_STAGE: 'NEXT_STAGE',
     SET_ERROR: 'SET_ERROR',
     ADMIN_OVERRIDE: 'ADMIN_OVERRIDE',
+    LOGOUT: 'LOGOUT', // Added LOGOUT action
 };
 
 // Reducer
 function gameReducer(state, action) {
     switch (action.type) {
         case ACTION.LOGIN:
-            const assignedPath = getRoundPath(action.payload.id);
+            const roundSequence = action.payload.roundSequence || [1, 2, 3, 4];
             return {
                 ...state,
                 screen: 'LOBBY',
                 teamId: action.payload.id,
                 teamName: action.payload.name,
                 teamEmail: action.payload.email,
-                roundPath: assignedPath,
+                round: action.payload.round || 0,
+                stage: action.payload.stage || 0,
+                score: action.payload.score || 0,
+                roundSequence: roundSequence,
                 error: null,
             };
         case ACTION.START_ROUND:
             // If round 0 (Start Game), pick the first round from assigned path
-            const targetRound = action.payload.round === 0 ? state.roundPath[0] : action.payload.round;
+            const targetRound = action.payload.round === 0 ? state.roundSequence[0] : action.payload.round;
             return {
                 ...state,
                 screen: 'GAME',
@@ -134,12 +138,14 @@ export function GameProvider({ children }) {
         }
     }, [state]);
 
-    const login = (id, name, email) => {
+    const login = (id, name, email, roundSequence = [1, 2, 3, 4]) => {
         if (!id || !name || !email) {
             dispatch({ type: ACTION.SET_ERROR, payload: 'All fields required' });
             return;
         }
-        dispatch({ type: ACTION.LOGIN, payload: { id, name, email } });
+        // Save roundSequence to localStorage for persistence
+        localStorage.setItem('roundSequence', JSON.stringify(roundSequence));
+        dispatch({ type: ACTION.LOGIN, payload: { id, name, email, roundSequence } });
     };
 
     const logout = () => {
@@ -151,14 +157,14 @@ export function GameProvider({ children }) {
     };
 
     const getNextRound = (currentRound) => {
-        const path = state.roundPath || ROUND_PATHS[0];
-        const currentIndex = path.indexOf(currentRound);
+        const sequence = state.roundSequence || [1, 2, 3, 4];
+        const currentIndex = sequence.indexOf(currentRound);
 
-        if (currentIndex !== -1 && currentIndex < (path.length - 1)) {
-            // Move to next round in the shuffled path
-            return path[currentIndex + 1];
+        if (currentIndex !== -1 && currentIndex < (sequence.length - 1)) {
+            // Move to next round in team's assigned sequence
+            return sequence[currentIndex + 1];
         } else {
-            // Path complete (all 4 done), Game Over / Win State
+            // All rounds complete, Game Over / Win State
             return 100; // 100 = GAME_COMPLETE
         }
     };

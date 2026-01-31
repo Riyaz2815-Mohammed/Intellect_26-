@@ -48,7 +48,7 @@ export const SQL_CHALLENGES = [
         scrambled: [
             "JOIN", "orders.amount", "users.name,", "orders.user_id",
             "SELECT", "=", "users",
-            "FROM", "users.id", "ON","orders"
+            "FROM", "users.id", "ON", "orders"
         ],
         answer: "SELECT users.name, orders.amount FROM users JOIN orders ON users.id = orders.user_id",
         hint: "Standard JOIN syntax"
