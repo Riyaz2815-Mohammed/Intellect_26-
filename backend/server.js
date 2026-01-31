@@ -381,37 +381,55 @@ app.post('/api/game/submit', async (req, res) => {
             [teamId, round, stage, JSON.stringify(answer), result.success, pointsAwarded, timeBonus, timeTaken, result.message]
         );
 
-        if (result.success && result.triggerEmail) {
-            // Email is sent ONLY after completing Round 3 (Memory/Flash round)
-            // This is an advantage for completing the hardest round
-            if (parseInt(round) === 3) {
+        // EMAIL SENDING: Round 3 (Flash/Memory) Completion Advantage
+        if (result.success && parseInt(round) === 3) {
+            console.log(`[FLASH COMPLETE] Team ${teamId} (${team.team_name}) completed Round 3!`);
+
+            try {
                 // Get team's round sequence to find next round
-                const { rows: [teamData] } = await pool.query(
-                    'SELECT round_sequence FROM teams WHERE team_id = $1',
+                const { rows: teamDataRows } = await pool.query(
+                    'SELECT round_sequence, team_name, email FROM teams WHERE team_id = $1',
                     [teamId]
                 );
 
-                const sequence = teamData.round_sequence || [1, 2, 3, 4];
-                const currentIndex = sequence.indexOf(3); // Round 3 position in sequence
-                const nextRound = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null;
-
-                if (nextRound) {
-                    // Fetch code for next round in sequence
-                    const { rows: codes } = await pool.query(
-                        'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
-                        [teamId, nextRound]
-                    );
-
-                    if (codes.length > 0) {
-                        const code = codes[0].code;
-                        console.log(`[EMAIL ADVANTAGE] Round 3 complete! Sending Round ${nextRound} code to ${team.email}`);
-                        await sendAdvantageCodeEmail(team.email, team.team_name, code, nextRound);
-                    } else {
-                        console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
-                    }
+                if (teamDataRows.length === 0) {
+                    console.error(`[EMAIL ERROR] Team ${teamId} not found in database`);
                 } else {
-                    console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
+                    const teamData = teamDataRows[0];
+                    const sequence = teamData.round_sequence || [1, 2, 3, 4];
+                    const currentIndex = sequence.indexOf(3); // Round 3 position in sequence
+                    const nextRound = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null;
+
+                    console.log(`[EMAIL] Team sequence: ${sequence.join('→')}, Next round: ${nextRound || 'NONE (Final round)'}`);
+
+                    if (nextRound) {
+                        // Fetch code for next round in sequence
+                        const { rows: codes } = await pool.query(
+                            'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
+                            [teamId, nextRound]
+                        );
+
+                        if (codes.length > 0) {
+                            const code = codes[0].code;
+                            console.log(`[EMAIL SENDING] Round ${nextRound} code: ${code} → ${teamData.email}`);
+
+                            const emailResult = await sendAdvantageCodeEmail(teamData.email, teamData.team_name, code, nextRound);
+
+                            if (emailResult && emailResult.success) {
+                                console.log(`✅ [EMAIL SUCCESS] Advantage code sent to ${teamData.email}`);
+                            } else {
+                                console.error(`❌ [EMAIL FAILED] ${emailResult?.error || 'Unknown error'}`);
+                            }
+                        } else {
+                            console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
+                        }
+                    } else {
+                        console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
+                    }
                 }
+            } catch (emailError) {
+                console.error('[EMAIL ERROR] Failed to send advantage code:', emailError);
+                // Don't fail the submission if email fails
             }
         }
 
