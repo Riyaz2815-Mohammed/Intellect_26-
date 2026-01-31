@@ -730,16 +730,25 @@ app.post('/api/admin/create-team', async (req, res) => {
             });
         }
 
-        // Generate unique round sequence for this team
-        const numericId = parseInt(teamId.split('-')[1]);
-        const roundSequence = generateRoundSequence(numericId);
+        // Generate unique round sequence based on TEAM COUNT (Deterministic Round Robin)
+        // Get current number of teams to determine the next sequence index
+        const { rows: countResult } = await pool.query('SELECT COUNT(*) FROM teams');
+        const teamCount = parseInt(countResult[0].count);
 
-        // Ensure roundSequence is valid before joining
-        if (!roundSequence) {
-            console.error(`[CREATE TEAM] Failed to generate sequence for ID: ${teamId}`);
-        } else {
-            console.log(`[CREATE TEAM] Team ${teamId} assigned sequence: ${roundSequence.join('→')}`);
-        }
+        // Assign sequence: 1st team -> seq[0], 2nd team -> seq[1], etc.
+        const sequenceIndex = teamCount % 4; // 0, 1, 2, 3
+
+        // We use the modified generator that accepts an explicit index
+        // or we just pick directly here. Let's use the explicit index approach.
+        const sequences = [
+            [1, 2, 3, 4], // Team 1: Normal
+            [2, 4, 1, 3], // Team 2: Different
+            [3, 1, 4, 2], // Team 3: Different
+            [4, 3, 2, 1]  // Team 4: Reverse
+        ];
+        const roundSequence = sequences[sequenceIndex];
+
+        console.log(`[CREATE TEAM] Team Count: ${teamCount} -> Assigned Sequence Index: ${sequenceIndex} (${roundSequence.join('→')})`);
 
         // Insert team with round sequence
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
