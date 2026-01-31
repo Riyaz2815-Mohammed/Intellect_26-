@@ -58,7 +58,7 @@ const LeaderboardScreen = ({ onBack }) => {
 
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                    TYPEWRITING_UPLINK...
+                    ESTABLISHING UPLINK...
                 </div>
             ) : (
                 <div style={{

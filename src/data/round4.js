@@ -250,14 +250,9 @@ export const validatePhase2Answers = (answers) => {
     }
 };
 
-// ============================================
-// EMAIL CODE GENERATION
-// ============================================
-
-export const ROUND4_CODE = 'CRPT-8124';
-
 
 export const ROUND4_PLACE = "Oval";
+export const ROUND4_CODE = 'CRPT-8124';
 
 // Export all tables as a collection for easy rendering
 export const ROUND4_TABLES = {

@@ -396,35 +396,41 @@ app.post('/api/game/submit', async (req, res) => {
                     console.error(`[EMAIL ERROR] Team ${teamId} not found in database`);
                 } else {
                     const teamData = teamDataRows[0];
-                    const sequence = teamData.round_sequence || [1, 2, 3, 4];
-                    const currentIndex = sequence.indexOf(3); // Round 3 position in sequence
-                    const nextRound = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null;
 
-                    console.log(`[EMAIL] Team sequence: ${sequence.join('→')}, Next round: ${nextRound || 'NONE (Final round)'}`);
+                    // Validate email exists and is valid
+                    if (!teamData.email || !teamData.email.includes('@')) {
+                        console.error(`[EMAIL ERROR] Invalid email for Team ${teamId}: ${teamData.email || 'NULL'}`);
+                    } else {
+                        const sequence = teamData.round_sequence || [1, 2, 3, 4];
+                        const currentIndex = sequence.indexOf(3); // Round 3 position in sequence
+                        const nextRound = currentIndex < sequence.length - 1 ? sequence[currentIndex + 1] : null;
 
-                    if (nextRound) {
-                        // Fetch code for next round in sequence
-                        const { rows: codes } = await pool.query(
-                            'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
-                            [teamId, nextRound]
-                        );
+                        console.log(`[EMAIL] Team sequence: ${sequence.join('→')}, Next round: ${nextRound || 'NONE (Final round)'}`);
 
-                        if (codes.length > 0) {
-                            const code = codes[0].code;
-                            console.log(`[EMAIL SENDING] Round ${nextRound} code: ${code} → ${teamData.email}`);
+                        if (nextRound) {
+                            // Fetch code for next round in sequence
+                            const { rows: codes } = await pool.query(
+                                'SELECT code FROM physical_codes WHERE team_id = $1 AND round = $2',
+                                [teamId, nextRound]
+                            );
 
-                            const emailResult = await sendAdvantageCodeEmail(teamData.email, teamData.team_name, code, nextRound);
+                            if (codes.length > 0) {
+                                const code = codes[0].code;
+                                console.log(`[EMAIL SENDING] Round ${nextRound} code: ${code} → ${teamData.email}`);
 
-                            if (emailResult && emailResult.success) {
-                                console.log(`✅ [EMAIL SUCCESS] Advantage code sent to ${teamData.email}`);
+                                const emailResult = await sendAdvantageCodeEmail(teamData.email, teamData.team_name, code, nextRound);
+
+                                if (emailResult && emailResult.success) {
+                                    console.log(`✅ [EMAIL SUCCESS] Advantage code sent to ${teamData.email}`);
+                                } else {
+                                    console.error(`❌ [EMAIL FAILED] ${emailResult?.error || 'Unknown error'}`);
+                                }
                             } else {
-                                console.error(`❌ [EMAIL FAILED] ${emailResult?.error || 'Unknown error'}`);
+                                console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
                             }
                         } else {
-                            console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
+                            console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
                         }
-                    } else {
-                        console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
                     }
                 }
             } catch (emailError) {

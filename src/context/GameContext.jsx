@@ -181,7 +181,7 @@ export function GameProvider({ children }) {
             if (state.teamId) {
                 // Determine 'round' for backend (Backend expects integer)
                 // Note: Frontend state.round is synced with backend
-                await fetch(`${API_BASE_URL}/game/submit`, {
+                const response = await fetch(`${API_BASE_URL}/game/submit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -191,9 +191,17 @@ export function GameProvider({ children }) {
                         answer: answer
                     })
                 });
+
+                if (!response.ok) {
+                    console.error(`[BACKEND] Submission failed: ${response.status}`);
+                    // Still continue with client-side validation
+                } else {
+                    const backendResult = await response.json();
+                    console.log('[BACKEND] Submission recorded:', backendResult);
+                }
             }
         } catch (err) {
-            console.error('Backend submission failed:', err);
+            console.error('[BACKEND] Network error:', err);
             // We continue with client-side result so game doesn't break offline
         }
 
