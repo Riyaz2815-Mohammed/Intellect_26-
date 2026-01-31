@@ -618,6 +618,28 @@ const AdminPanel = () => {
                             )}
 
                             <div className="teams-section">
+                                <div style={{
+                                    marginBottom: '1.5rem',
+                                    padding: '0.8rem 1rem',
+                                    background: 'rgba(0, 255, 65, 0.05)',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(0, 255, 65, 0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem',
+                                    flexWrap: 'wrap',
+                                    fontSize: '0.85rem'
+                                }}>
+                                    <strong style={{ color: '#fff' }}>ROUND KEY:</strong>
+                                    <span><strong style={{ color: 'var(--accent-primary)' }}>1</strong> SQL Basics</span>
+                                    <span style={{ color: '#444' }}>|</span>
+                                    <span><strong style={{ color: 'var(--accent-primary)' }}>2</strong> Physical Access</span>
+                                    <span style={{ color: '#444' }}>|</span>
+                                    <span><strong style={{ color: 'var(--accent-primary)' }}>3</strong> Memory Analysis</span>
+                                    <span style={{ color: '#444' }}>|</span>
+                                    <span><strong style={{ color: 'var(--accent-primary)' }}>4</strong> Advanced Queries</span>
+                                </div>
+
                                 <h2>Teams ({teams.length})</h2>
                                 <div className="teams-table">
                                     <table>

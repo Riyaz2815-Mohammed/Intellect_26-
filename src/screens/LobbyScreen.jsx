@@ -38,29 +38,49 @@ const LobbyScreen = () => {
                         YOUR MISSION SEQUENCE
                     </h3>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {(state.roundSequence || [1, 2, 3, 4]).map((round, index) => (
-                            <div key={index} style={{
-                                background: index === 0 ? 'var(--accent-primary)' : 'rgba(0, 0, 0, 0.5)',
-                                color: index === 0 ? '#000' : 'var(--accent-primary)',
-                                border: `2px solid var(--accent-primary)`,
-                                borderRadius: '8px',
-                                padding: '12px 16px',
-                                minWidth: '100px',
-                                fontWeight: 'bold',
-                                boxShadow: index === 0 ? '0 0 20px rgba(0, 255, 65, 0.5)' : 'none',
-                                transition: 'all 0.3s ease'
-                            }}>
-                                <div style={{ fontSize: '1.3rem', marginBottom: '4px' }}>
-                                    {index + 1}
+                        {(state.roundSequence || [1, 2, 3, 4]).map((round, index) => {
+                            // Calculate current index in the sequence
+                            const sequence = state.roundSequence || [1, 2, 3, 4];
+                            const currentRoundNum = state.round === 0 ? sequence[0] : state.round;
+                            const currentIndex = sequence.indexOf(currentRoundNum);
+                            const isFuture = index > currentIndex;
+                            const isPast = index < currentIndex;
+
+                            // If round is complete (100+), all are past
+                            const isComplete = state.round >= 100;
+                            const effectiveIsFuture = isComplete ? false : isFuture;
+
+                            return (
+                                <div key={index} style={{
+                                    background: effectiveIsFuture
+                                        ? 'rgba(0, 0, 0, 0.3)'
+                                        : (index === currentIndex && !isComplete) ? 'var(--accent-primary)' : 'rgba(0, 50, 20, 0.4)',
+                                    color: effectiveIsFuture
+                                        ? '#555'
+                                        : (index === currentIndex && !isComplete) ? '#000' : 'var(--accent-primary)',
+                                    border: effectiveIsFuture
+                                        ? '2px dashed #444'
+                                        : `2px solid var(--accent-primary)`,
+                                    borderRadius: '8px',
+                                    padding: '12px 16px',
+                                    minWidth: '100px',
+                                    fontWeight: 'bold',
+                                    boxShadow: (index === currentIndex && !isComplete) ? '0 0 20px rgba(0, 255, 65, 0.5)' : 'none',
+                                    transition: 'all 0.3s ease',
+                                    opacity: effectiveIsFuture ? 0.7 : 1
+                                }}>
+                                    <div style={{ fontSize: '1.3rem', marginBottom: '4px' }}>
+                                        {index + 1}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
+                                        {effectiveIsFuture ? 'LOCKED' : `ROUND ${round}`}
+                                    </div>
+                                    <div style={{ fontSize: '0.6rem', marginTop: '4px' }}>
+                                        {effectiveIsFuture ? '??????' : roundNames[round]}
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
-                                    ROUND {round}
-                                </div>
-                                <div style={{ fontSize: '0.6rem', marginTop: '4px' }}>
-                                    {roundNames[round]}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     <p style={{ marginTop: '15px', fontSize: '0.8rem', color: '#999' }}>
                         Complete all missions in this order to finish the challenge
