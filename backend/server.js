@@ -730,25 +730,39 @@ app.post('/api/admin/create-team', async (req, res) => {
             });
         }
 
-        // Generate unique round sequence based on TEAM COUNT (Deterministic Round Robin)
-        // Get current number of teams to determine the next sequence index
-        const { rows: countResult } = await pool.query('SELECT COUNT(*) FROM teams');
-        const teamCount = parseInt(countResult[0].count);
+        // Generate unique round sequence based on LAST CREATED TEAM (Rotation)
+        // This ensures that even if teams are deleted, the next team gets the next sequence in order.
 
-        // Assign sequence: 1st team -> seq[0], 2nd team -> seq[1], etc.
-        const sequenceIndex = teamCount % 4; // 0, 1, 2, 3
+        // 1. Get the sequence of the most recently created team
+        const { rows: lastTeamResult } = await pool.query(
+            'SELECT round_sequence FROM teams ORDER BY created_at DESC LIMIT 1'
+        );
 
-        // We use the modified generator that accepts an explicit index
-        // or we just pick directly here. Let's use the explicit index approach.
+        // Define sequences
         const sequences = [
-            [1, 2, 3, 4], // Team 1: Normal
-            [2, 4, 1, 3], // Team 2: Different
-            [3, 1, 4, 2], // Team 3: Different
-            [4, 3, 2, 1]  // Team 4: Reverse
+            [1, 2, 3, 4], // Index 0
+            [2, 4, 1, 3], // Index 1
+            [3, 1, 4, 2], // Index 2
+            [4, 3, 2, 1]  // Index 3
         ];
-        const roundSequence = sequences[sequenceIndex];
 
-        console.log(`[CREATE TEAM] Team Count: ${teamCount} -> Assigned Sequence Index: ${sequenceIndex} (${roundSequence.join('→')})`);
+        let nextIndex = 0; // Default to 0 (Seq 1) if no teams exist
+
+        if (lastTeamResult.length > 0) {
+            const lastSeq = lastTeamResult[0].round_sequence;
+
+            // Find which index the last sequence corresponds to
+            // We compare JSON stringified arrays for equality check
+            const lastIndex = sequences.findIndex(seq => JSON.stringify(seq) === JSON.stringify(lastSeq));
+
+            if (lastIndex !== -1) {
+                nextIndex = (lastIndex + 1) % 4; // Rotate to next
+            }
+        }
+
+        const roundSequence = sequences[nextIndex];
+
+        console.log(`[CREATE TEAM] Last Seq Index Found: ${lastTeamResult.length > 0 ? 'Yes' : 'None'} -> New Assigned Index: ${nextIndex} (${roundSequence.join('→')})`);
 
         // Insert team with round sequence
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
