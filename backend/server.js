@@ -60,8 +60,8 @@ function generateRoundSequence(teamId) {
         [4, 3, 2, 1]  // Team 4: Reverse order
     ];
 
-    // Use teamId to assign sequence (teamId 1-4 maps to index 0-3)
-    const index = (teamId - 1) % 4;
+    // Use teamId to assign sequence (ensure positive index 0-3)
+    const index = Math.abs(teamId % 4);
     return sequences[index];
 }
 
@@ -731,8 +731,15 @@ app.post('/api/admin/create-team', async (req, res) => {
         }
 
         // Generate unique round sequence for this team
-        const roundSequence = generateRoundSequence(parseInt(teamId));
-        console.log(`[CREATE TEAM] Team ${teamId} assigned sequence: ${roundSequence.join('→')}`);
+        const numericId = parseInt(teamId.split('-')[1]);
+        const roundSequence = generateRoundSequence(numericId);
+
+        // Ensure roundSequence is valid before joining
+        if (!roundSequence) {
+            console.error(`[CREATE TEAM] Failed to generate sequence for ID: ${teamId}`);
+        } else {
+            console.log(`[CREATE TEAM] Team ${teamId} assigned sequence: ${roundSequence.join('→')}`);
+        }
 
         // Insert team with round sequence
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
