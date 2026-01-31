@@ -69,14 +69,11 @@ const LobbyScreen = () => {
                                     transition: 'all 0.3s ease',
                                     opacity: effectiveIsFuture ? 0.7 : 1
                                 }}>
-                                    <div style={{ fontSize: '1.3rem', marginBottom: '4px' }}>
+                                    <div style={{ fontSize: '1.3rem', marginBottom: '8px' }}>
                                         {index + 1}
                                     </div>
-                                    <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
-                                        {effectiveIsFuture ? 'LOCKED' : `ROUND ${round}`}
-                                    </div>
-                                    <div style={{ fontSize: '0.6rem', marginTop: '4px' }}>
-                                        {effectiveIsFuture ? '??????' : roundNames[round]}
+                                    <div style={{ fontSize: '0.65rem', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                        {effectiveIsFuture ? 'SYSTEM LOCKED' : roundNames[round]}
                                     </div>
                                 </div>
                             );
