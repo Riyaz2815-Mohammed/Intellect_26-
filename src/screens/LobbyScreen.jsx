@@ -12,9 +12,16 @@ const LobbyScreen = () => {
     };
 
     return (
-        <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', textAlign: 'center' }}>
+        <div className="container" style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            minHeight: '80vh',
+            paddingTop: '4rem',
+            textAlign: 'center'
+        }}>
             <div className="animate-fade-in">
-                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 'normal' }}>
+                <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem', fontWeight: 'normal', color: '#fff' }}>
                     Welcome, <span style={{ color: 'var(--accent-secondary)', fontWeight: 'bold' }}>{state.teamName || state.teamId}</span>
                 </h2>
 
@@ -24,7 +31,7 @@ const LobbyScreen = () => {
                     border: '2px solid var(--accent-primary)',
                     borderRadius: '10px',
                     padding: '20px',
-                    margin: '20px auto',
+                    margin: '40px auto 30px',
                     maxWidth: '600px'
                 }}>
                     <h3 style={{ color: 'var(--accent-secondary)', marginBottom: '15px', fontSize: '0.85rem', letterSpacing: '2px', fontWeight: 'normal' }}>
@@ -64,7 +71,7 @@ const LobbyScreen = () => {
                     CORE MISSIONS COMPLETED: {state.round >= 100 ? 4 : Math.max(0, (state.roundSequence || [1, 2, 3, 4]).indexOf(state.round === 0 ? (state.roundSequence || [1, 2, 3, 4])[0] : state.round))} / 4
                 </div>
 
-                <div style={{ position: 'relative', width: '100px', height: '100px', margin: '2rem auto' }}>
+                <div style={{ position: 'relative', width: '60px', height: '60px', margin: '1.5rem auto' }}>
                     <div className="spin-slow" style={{
                         position: 'absolute',
                         top: 0,
@@ -80,8 +87,8 @@ const LobbyScreen = () => {
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        width: '20px',
-                        height: '20px',
+                        width: '12px',
+                        height: '12px',
                         background: 'var(--accent-primary)',
                         borderRadius: '50%',
                         boxShadow: '0 0 15px var(--accent-primary)'
