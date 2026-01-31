@@ -924,6 +924,7 @@ const GameScreen = () => {
     const [levelData, setLevelData] = useState(null);
     const [showRetry, setShowRetry] = useState(false);
     const [resetKey, setResetKey] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false); // Prevent double-submission
 
     // --- MISSION BRIEFING LOGIC ---
     const [showBriefing, setShowBriefing] = useState(false);
@@ -953,17 +954,30 @@ const GameScreen = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return; // Prevent double-submission
 
-        const result = await submitAnswer(input);
-        if (!result.success) {
-            setShowRetry(true);
+        setIsSubmitting(true);
+        try {
+            const result = await submitAnswer(input);
+            if (!result.success) {
+                setShowRetry(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleDragDropSubmit = async (query) => {
-        const result = await submitAnswer(query);
-        if (!result.success) {
-            setShowRetry(true);
+        if (isSubmitting) return; // Prevent double-submission
+
+        setIsSubmitting(true);
+        try {
+            const result = await submitAnswer(query);
+            if (!result.success) {
+                setShowRetry(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -973,26 +987,47 @@ const GameScreen = () => {
     };
 
     const handleRound4Submit = async (answers, setIncorrectQuestions) => {
-        const result = await submitAnswer(JSON.stringify(answers));
-        if (!result.success && result.incorrectQuestions) {
-            setIncorrectQuestions(result.incorrectQuestions);
-            setShowRetry(true);
+        if (isSubmitting) return; // Prevent double-submission
+
+        setIsSubmitting(true);
+        try {
+            const result = await submitAnswer(JSON.stringify(answers));
+            if (!result.success && result.incorrectQuestions) {
+                setIncorrectQuestions(result.incorrectQuestions);
+                setShowRetry(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleQueryMatching = async (mapping, setIncorrectQueries) => {
-        const result = await submitAnswer(JSON.stringify(mapping));
-        if (!result.success && result.incorrectQueries) {
-            setIncorrectQueries(result.incorrectQueries);
-            setShowRetry(true);
+        if (isSubmitting) return; // Prevent double-submission
+
+        setIsSubmitting(true);
+        try {
+            const result = await submitAnswer(JSON.stringify(mapping));
+            if (!result.success && result.incorrectQueries) {
+                setIncorrectQueries(result.incorrectQueries);
+                setShowRetry(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleQueryFixing = async (answers, setIncorrectQuestions) => {
-        const result = await submitAnswer(JSON.stringify(answers));
-        if (!result.success && result.incorrectQuestions) {
-            setIncorrectQuestions(result.incorrectQuestions);
-            setShowRetry(true);
+        if (isSubmitting) return; // Prevent double-submission
+
+        setIsSubmitting(true);
+        try {
+            const result = await submitAnswer(JSON.stringify(answers));
+            if (!result.success && result.incorrectQuestions) {
+                setIncorrectQuestions(result.incorrectQuestions);
+                setShowRetry(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -1412,8 +1447,16 @@ const GameScreen = () => {
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                     {levelData.type === 'SQL_ORDER' ? 'NOTE: ORDER MATTERS' : 'SECURE CHANNEL'}
                                 </span>
-                                <button type="submit" className="btn btn-primary">
-                                    {levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE'}
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    disabled={isSubmitting}
+                                    style={{
+                                        opacity: isSubmitting ? 0.6 : 1,
+                                        cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {isSubmitting ? 'PROCESSING...' : (levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE')}
                                 </button>
                             </div>
                         </form>
