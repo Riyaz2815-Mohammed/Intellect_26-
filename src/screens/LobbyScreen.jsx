@@ -14,8 +14,8 @@ const LobbyScreen = () => {
     return (
         <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', textAlign: 'center' }}>
             <div className="animate-fade-in">
-                <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-                    Welcome, <span style={{ color: 'var(--accent-secondary)' }}>{state.teamName || state.teamId}</span>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 'normal' }}>
+                    Welcome, <span style={{ color: 'var(--accent-secondary)', fontWeight: 'bold' }}>{state.teamName || state.teamId}</span>
                 </h2>
 
                 {/* Round Sequence Display */}
