@@ -27,7 +27,7 @@ const LobbyScreen = () => {
                     margin: '20px auto',
                     maxWidth: '600px'
                 }}>
-                    <h3 style={{ color: 'var(--accent-secondary)', marginBottom: '15px', fontSize: '1rem', letterSpacing: '2px' }}>
+                    <h3 style={{ color: 'var(--accent-secondary)', marginBottom: '15px', fontSize: '0.85rem', letterSpacing: '2px', fontWeight: 'normal' }}>
                         YOUR MISSION SEQUENCE
                     </h3>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -55,12 +55,12 @@ const LobbyScreen = () => {
                             </div>
                         ))}
                     </div>
-                    <p style={{ marginTop: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <p style={{ marginTop: '15px', fontSize: '0.8rem', color: '#999' }}>
                         Complete all missions in this order to finish the challenge
                     </p>
                 </div>
 
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem', letterSpacing: '2px' }}>
+                <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '1.5rem', letterSpacing: '1px', fontWeight: 'bold' }}>
                     CORE MISSIONS COMPLETED: {state.round >= 100 ? 4 : Math.max(0, (state.roundSequence || [1, 2, 3, 4]).indexOf(state.round === 0 ? (state.roundSequence || [1, 2, 3, 4])[0] : state.round))} / 4
                 </div>
 
@@ -91,23 +91,38 @@ const LobbyScreen = () => {
                 <h3 style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>
                     {state.round >= 100 ? 'MISSION ACCOMPLISHED' : 'SYSTEM READY'}
                 </h3>
-                <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', letterSpacing: '0.2em', fontSize: '1rem' }}>
+                <h4 style={{ color: '#999', marginBottom: '0.5rem', letterSpacing: '0.15em', fontSize: '0.9rem', fontWeight: 'normal' }}>
                     NEXT CHALLENGE LOADING...
                 </h4>
 
-                <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                <p style={{ fontSize: '0.95rem', color: '#999', marginBottom: '2rem' }}>
                     Your system is synchronized and ready for the next challenge.
                 </p>
 
                 <button
                     className="btn btn-primary"
                     onClick={() => startRound(state.round || 0, 600)}
-                    style={{ padding: '1.5rem 3rem', fontSize: '1.2rem' }}
+                    style={{
+                        padding: '1.2rem 3.5rem',
+                        fontSize: '1.3rem',
+                        fontWeight: 'bold',
+                        letterSpacing: '0.1em',
+                        boxShadow: '0 0 30px rgba(0, 255, 65, 0.4)',
+                        transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.boxShadow = '0 0 40px rgba(0, 255, 65, 0.6)';
+                        e.target.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.boxShadow = '0 0 30px rgba(0, 255, 65, 0.4)';
+                        e.target.style.transform = 'scale(1)';
+                    }}
                 >
                     🚀 START MISSION
                 </button>
 
-                <p style={{ marginTop: '2rem', fontFamily: 'var(--font-code)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <p style={{ marginTop: '2rem', fontFamily: 'var(--font-code)', fontSize: '0.75rem', color: '#666' }}>
                     System ID: {state.teamId} // Status: ACCESS_GRANTED
                 </p>
             </div>
