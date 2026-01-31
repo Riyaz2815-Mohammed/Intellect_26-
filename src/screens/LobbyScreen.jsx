@@ -30,26 +30,26 @@ const LobbyScreen = () => {
                     <h3 style={{ color: 'var(--accent-secondary)', marginBottom: '15px', fontSize: '1rem', letterSpacing: '2px' }}>
                         YOUR MISSION SEQUENCE
                     </h3>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         {(state.roundSequence || [1, 2, 3, 4]).map((round, index) => (
                             <div key={index} style={{
                                 background: index === 0 ? 'var(--accent-primary)' : 'rgba(0, 0, 0, 0.5)',
                                 color: index === 0 ? '#000' : 'var(--accent-primary)',
                                 border: `2px solid var(--accent-primary)`,
                                 borderRadius: '8px',
-                                padding: '15px 20px',
-                                minWidth: '120px',
+                                padding: '12px 16px',
+                                minWidth: '100px',
                                 fontWeight: 'bold',
                                 boxShadow: index === 0 ? '0 0 20px rgba(0, 255, 65, 0.5)' : 'none',
                                 transition: 'all 0.3s ease'
                             }}>
-                                <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}>
+                                <div style={{ fontSize: '1.3rem', marginBottom: '4px' }}>
                                     {index + 1}
                                 </div>
-                                <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
                                     ROUND {round}
                                 </div>
-                                <div style={{ fontSize: '0.65rem', marginTop: '5px' }}>
+                                <div style={{ fontSize: '0.6rem', marginTop: '4px' }}>
                                     {roundNames[round]}
                                 </div>
                             </div>

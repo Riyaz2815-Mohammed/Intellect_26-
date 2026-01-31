@@ -93,22 +93,32 @@ function App() {
           </div>
 
           {state.teamId && (
-            <div style={{ fontFamily: 'var(--font-code)', fontSize: '0.9rem' }}>
-              TEAM: <span style={{ color: 'var(--accent-secondary)' }}>{state.teamName || state.teamId}</span>
-              <span style={{ margin: '0 0.5rem', color: '#333' }}>|</span>
-              SCORE: {state.score}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              fontFamily: 'var(--font-code)',
+              fontSize: '0.9rem'
+            }}>
+              <div>
+                TEAM: <span style={{ color: 'var(--accent-secondary)' }}>{state.teamName || state.teamId}</span>
+              </div>
+              <span style={{ color: '#333' }}>|</span>
+              <div>
+                SCORE: <span style={{ color: 'var(--accent-primary)' }}>{state.score}</span>
+              </div>
               <button
                 onClick={() => setCurrentView('leaderboard')}
                 style={{
-                  marginLeft: '1rem',
-                  padding: '2px 8px',
+                  padding: '4px 12px',
                   fontSize: '0.75rem',
-                  background: 'rgba(0, 255, 65, 0.1)',
-                  border: '1px solid var(--accent-primary)',
-                  color: 'var(--accent-primary)',
+                  background: 'rgba(255, 215, 0, 0.1)',
+                  border: '1px solid #FFD700',
+                  color: '#FFD700',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontFamily: 'var(--font-code)'
+                  fontFamily: 'var(--font-code)',
+                  fontWeight: 'bold'
                 }}
               >
                 LEADERBOARD
@@ -120,8 +130,7 @@ function App() {
                   }
                 }}
                 style={{
-                  marginLeft: '1rem',
-                  padding: '2px 8px',
+                  padding: '4px 12px',
                   fontSize: '0.75rem',
                   background: 'rgba(255, 51, 51, 0.1)',
                   border: '1px solid #ff3333',
