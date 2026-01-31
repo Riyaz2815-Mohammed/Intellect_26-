@@ -7,7 +7,6 @@
 |-------|----------|-------------|
 | Round 1 | **CANTEEN** | `CRPT-7712` |
 | Round 2 | **OPEN AUDI** | `CRPT-5521` |
-| Round 3 | **RUDRA BLOCK** | `CRPT-9384` |
 | Round 4 | **OVAL** | `CRPT-8124` |
 
 ### Email Advantage
@@ -100,8 +99,6 @@ WHERE students.id = 101
 
 ## 🎯 Round 3: Flash/Memory Analysis
 
-**Location**: RUDRA BLOCK  
-**Code**: `CRPT-9384`  
 **Stages**: 5 flash memory challenges  
 **Special**: Completing this round triggers email advantage
 

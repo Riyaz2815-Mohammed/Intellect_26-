@@ -6,6 +6,7 @@ const CompletionScreen = () => {
     const { state } = useGame();
     const [leaderboard, setLeaderboard] = useState([]);
     const [teamPosition, setTeamPosition] = useState(null);
+    const [teamData, setTeamData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [confettiActive, setConfettiActive] = useState(true);
 
@@ -24,9 +25,12 @@ const CompletionScreen = () => {
 
             setLeaderboard(data.slice(0, 10)); // Top 10
 
-            // Find current team position
+            // Find current team position and data
             const position = data.findIndex(team => team.team_name === state.teamName) + 1;
+            const currentTeam = data.find(team => team.team_name === state.teamName);
+
             setTeamPosition(position);
+            setTeamData(currentTeam);
 
             setLoading(false);
         } catch (error) {
@@ -50,6 +54,7 @@ const CompletionScreen = () => {
     };
 
     const formatTime = (seconds) => {
+        if (!seconds || seconds === 0) return '0:00';
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -93,7 +98,7 @@ const CompletionScreen = () => {
                     <div className="stats-grid">
                         <div className="stat-card">
                             <div className="stat-icon">🏆</div>
-                            <div className="stat-value">{state.score}</div>
+                            <div className="stat-value">{teamData?.total_score || state.score}</div>
                             <div className="stat-label">Total Points</div>
                         </div>
                         <div className="stat-card">
@@ -103,7 +108,7 @@ const CompletionScreen = () => {
                         </div>
                         <div className="stat-card">
                             <div className="stat-icon">⏱️</div>
-                            <div className="stat-value">{formatTime(state.totalTime || 0)}</div>
+                            <div className="stat-value">{formatTime(teamData?.total_time || 0)}</div>
                             <div className="stat-label">Total Time</div>
                         </div>
                     </div>

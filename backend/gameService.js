@@ -27,6 +27,22 @@ const validatePhase2Input = (input, expected) => {
     return normalized.includes(exp);
 };
 
+// ==================== SCORING CONFIGURATION ====================
+
+const ROUND_CONFIG = {
+    1: { basePoints: 100, timeLimit: 300, timeMultiplier: 0.3, completionBonus: 100 },  // Easy
+    2: { basePoints: 150, timeLimit: 600, timeMultiplier: 0.2, completionBonus: 150 },  // Medium
+    3: { basePoints: 200, timeLimit: 120, timeMultiplier: 0.5, completionBonus: 200 },  // Hard (Memory)
+    4: { basePoints: 250, timeLimit: 180, timeMultiplier: 0.4, completionBonus: 250 }   // Very Hard
+};
+
+const RETRY_PENALTY = {
+    0: 0,    // 1st attempt
+    1: 20,   // 2nd attempt
+    2: 40,   // 3rd attempt
+    3: 60    // 4th+ attempt (capped)
+};
+
 // ==================== MAIN VALIDATION LOGIC ====================
 
 const validateSubmission = (round, stage, answer) => {
@@ -39,7 +55,7 @@ const validateSubmission = (round, stage, answer) => {
             // In a production env, we would run the query against a readonly DB
             return {
                 success: true,
-                points: 100,
+                points: ROUND_CONFIG[1].basePoints,
                 message: 'Query executed successfully'
             };
         }
@@ -48,7 +64,7 @@ const validateSubmission = (round, stage, answer) => {
         if (round === 2) {
             return {
                 success: true,
-                points: 150,
+                points: ROUND_CONFIG[2].basePoints,
                 message: 'Optimization verified'
             };
         }
@@ -58,7 +74,7 @@ const validateSubmission = (round, stage, answer) => {
             if (stage <= 5) {
                 return {
                     success: true,
-                    points: 200,
+                    points: ROUND_CONFIG[3].basePoints,
                     message: 'Analysis accepted',
                     triggerEmail: stage === 5 // Trigger email on completion of Stage 5
                 };
@@ -69,7 +85,7 @@ const validateSubmission = (round, stage, answer) => {
                 if (codePattern.test(answer.trim())) {
                     return {
                         success: true,
-                        points: 200,
+                        points: ROUND_CONFIG[3].basePoints,
                         message: 'Access code verified'
                     };
                 } else {
@@ -96,7 +112,7 @@ const validateSubmission = (round, stage, answer) => {
                 });
 
                 if (incorrect.length === 0) {
-                    return { success: true, points: 150, message: 'Matches correct' };
+                    return { success: true, points: ROUND_CONFIG[4].basePoints, message: 'Matches correct' };
                 } else {
                     return { success: false, message: `Incorrect matches: ${incorrect.join(', ')}` };
                 }
@@ -124,7 +140,7 @@ const validateSubmission = (round, stage, answer) => {
                 if (allCorrect) {
                     return {
                         success: true,
-                        points: 150,
+                        points: ROUND_CONFIG[4].basePoints,
                         message: 'All fixes correct',
                         triggerEmail: true // Important for Round 4
                     };
@@ -143,7 +159,7 @@ const validateSubmission = (round, stage, answer) => {
                 if (codePattern.test(answer.trim())) {
                     return {
                         success: true,
-                        points: 200,
+                        points: ROUND_CONFIG[4].basePoints,
                         message: 'Advantage code verified'
                     };
                 } else {
@@ -160,5 +176,7 @@ const validateSubmission = (round, stage, answer) => {
 };
 
 module.exports = {
-    validateSubmission
+    validateSubmission,
+    ROUND_CONFIG,
+    RETRY_PENALTY
 };

@@ -102,15 +102,22 @@ const WinScreen = ({ state }) => {
     );
 };
 
-// Flash Challenge Component
+// Flash Challenge Component with Disclaimer and Retry Penalty
 const FlashChallengeContent = ({ levelData }) => {
     const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
     const [isLocked, setIsLocked] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(true);
+    const [retryCount, setRetryCount] = useState(0);
+    const [adjustedDuration, setAdjustedDuration] = useState(levelData.flashDuration);
 
     useEffect(() => {
-        setFlashTimeLeft(levelData.flashDuration);
+        // Calculate adjusted duration based on retries (reduce 2s per retry)
+        const newDuration = Math.max(5, levelData.flashDuration - (retryCount * 2));
+        setAdjustedDuration(newDuration);
+        setFlashTimeLeft(newDuration);
         setIsLocked(false);
-    }, [levelData]);
+        setShowDisclaimer(true);
+    }, [levelData, retryCount]);
 
     useEffect(() => {
         if (flashTimeLeft <= 0) {
@@ -205,36 +212,134 @@ const FlashChallengeContent = ({ levelData }) => {
 
     return (
         <div>
-            {!isLocked ? (
-                <div className="animate-fade-in">
-                    <div style={{
-                        background: 'rgba(255, 204, 0, 0.1)',
-                        border: '2px solid var(--accent-warning)',
-                        padding: '1rem',
-                        marginBottom: '1.5rem',
-                        textAlign: 'center',
-                        fontSize: '2rem',
-                        fontFamily: 'var(--font-code)',
-                        color: 'var(--accent-warning)',
-                        fontWeight: 'bold'
-                    }}>
-                        MEMORIZE: {flashTimeLeft}s
-                    </div>
-                    {renderFlashData()}
-                </div>
-            ) : (
+            {/* Disclaimer Popup */}
+            {showDisclaimer && (
                 <div style={{
-                    background: 'rgba(255, 51, 51, 0.1)',
-                    border: '2px solid var(--accent-error)',
-                    padding: '3rem',
-                    textAlign: 'center',
-                    borderRadius: 'var(--radius-md)'
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.95)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'fadeIn 0.3s ease-in'
                 }}>
-                    <h2 style={{ color: 'var(--accent-error)', marginBottom: '1rem' }}>🔒 DATA LOCKED</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>{levelData.prompt}</p>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '1rem', fontStyle: 'italic' }}>
-                        HINT: {levelData.hint}
-                    </p>
+                    <div style={{
+                        background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+                        border: '3px solid var(--accent-warning)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '2.5rem',
+                        maxWidth: '600px',
+                        textAlign: 'center',
+                        boxShadow: '0 0 50px rgba(255, 204, 0, 0.3)'
+                    }}>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚠️</div>
+                        <h2 style={{ color: 'var(--accent-warning)', marginBottom: '1.5rem', fontSize: '1.8rem' }}>
+                            MEMORY CHALLENGE AHEAD
+                        </h2>
+                        <div style={{
+                            background: 'rgba(255, 204, 0, 0.1)',
+                            padding: '1.5rem',
+                            borderRadius: 'var(--radius-md)',
+                            marginBottom: '1.5rem',
+                            border: '1px solid rgba(255, 204, 0, 0.3)'
+                        }}>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                                📊 The data will be visible for <strong style={{ color: 'var(--accent-warning)' }}>{adjustedDuration} seconds</strong>
+                            </p>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                                🔒 After that, it will be <strong style={{ color: 'var(--accent-error)' }}>LOCKED</strong>
+                            </p>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6' }}>
+                                🧠 Study carefully and memorize the information!
+                            </p>
+                        </div>
+                        {retryCount > 0 && (
+                            <div style={{
+                                background: 'rgba(255, 51, 51, 0.1)',
+                                border: '1px solid var(--accent-error)',
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md)',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <p style={{ color: 'var(--accent-error)', fontSize: '0.95rem' }}>
+                                    ⚠️ RETRY PENALTY: Time reduced by {retryCount * 2}s (Attempt #{retryCount + 1})
+                                </p>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setShowDisclaimer(false)}
+                            style={{
+                                background: 'var(--accent-warning)',
+                                color: '#000',
+                                border: 'none',
+                                padding: '1rem 3rem',
+                                fontSize: '1.2rem',
+                                fontWeight: 'bold',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.transform = 'scale(1.05)';
+                                e.target.style.boxShadow = '0 0 20px rgba(255, 204, 0, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.transform = 'scale(1)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        >
+                            I'M READY
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Main Content */}
+            {!showDisclaimer && (
+                <div>
+                    {!isLocked ? (
+                        <div className="animate-fade-in">
+                            <div style={{
+                                background: 'rgba(255, 204, 0, 0.1)',
+                                border: '2px solid var(--accent-warning)',
+                                padding: '1rem',
+                                marginBottom: '1.5rem',
+                                textAlign: 'center',
+                                fontSize: '2rem',
+                                fontFamily: 'var(--font-code)',
+                                color: 'var(--accent-warning)',
+                                fontWeight: 'bold'
+                            }}>
+                                MEMORIZE: {flashTimeLeft}s
+                                {retryCount > 0 && (
+                                    <span style={{ fontSize: '0.8rem', display: 'block', marginTop: '0.5rem', color: 'var(--accent-error)' }}>
+                                        (Retry #{retryCount + 1} - Reduced Time)
+                                    </span>
+                                )}
+                            </div>
+                            {renderFlashData()}
+                        </div>
+                    ) : (
+                        <div style={{
+                            background: 'rgba(255, 51, 51, 0.1)',
+                            border: '2px solid var(--accent-error)',
+                            padding: '3rem',
+                            textAlign: 'center',
+                            borderRadius: 'var(--radius-md)'
+                        }}>
+                            <h2 style={{ color: 'var(--accent-error)', marginBottom: '1rem' }}>🔒 DATA LOCKED</h2>
+                            <p style={{ color: 'var(--text-secondary)' }}>{levelData.prompt}</p>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '1rem', fontStyle: 'italic' }}>
+                                HINT: {levelData.hint}
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -1452,13 +1557,38 @@ const GameScreen = () => {
                                     className="btn btn-primary"
                                     disabled={isSubmitting}
                                     style={{
-                                        opacity: isSubmitting ? 0.6 : 1,
-                                        cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                                        opacity: isSubmitting ? 0.8 : 1,
+                                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                        background: isSubmitting ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                                        transform: isSubmitting ? 'scale(0.98)' : 'scale(1)',
+                                        transition: 'all 0.2s ease',
+                                        position: 'relative',
+                                        minWidth: '150px'
                                     }}
                                 >
-                                    {isSubmitting ? 'PROCESSING...' : (levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE')}
+                                    {isSubmitting ? (
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                                            <span style={{
+                                                display: 'inline-block',
+                                                width: '12px',
+                                                height: '12px',
+                                                border: '2px solid #000',
+                                                borderTopColor: 'transparent',
+                                                borderRadius: '50%',
+                                                animation: 'spin 0.6s linear infinite'
+                                            }}></span>
+                                            PROCESSING...
+                                        </span>
+                                    ) : (
+                                        levelData.type === 'LOCATION_REVEAL' ? 'AUTHENTICATE' : 'EXECUTE'
+                                    )}
                                 </button>
                             </div>
+                            <style>{`
+                                @keyframes spin {
+                                    to { transform: rotate(360deg); }
+                                }
+                            `}</style>
                         </form>
                     )}
             </div>

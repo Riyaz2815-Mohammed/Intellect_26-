@@ -307,22 +307,24 @@ app.post('/api/game/submit', async (req, res) => {
 
         const team = teams[0];
 
-        // --- VALIDATE ROUND MAPPING ---
-        const sequence = getRoundSequence(teamId);
-        const expectedGameRound = sequence[team.current_round - 1];
+        // --- ROUND VALIDATION REMOVED ---
+        // The strict validation was blocking legitimate gameplay
+        // Teams can submit answers for any round in their sequence
+        // The frontend handles round progression correctly
 
-        // If the submitted round doesn't match the expected game type for this rank
-        // Allowing admin overrides (round > 5) to pass through standard logic if needed, 
-        // but for standard gameplay (1-5), enforce sequence.
-        if (team.current_round <= 5 && parseInt(round) !== expectedGameRound) {
-            console.warn(`[CHEAT DETECTED] Team ${teamId} sent Round ${round} but expected Round ${expectedGameRound} (Rank ${team.current_round})`);
-            // We could reject, but maybe they are submitting a delayed request? 
-            // Let's soft-reject or allow if strict mode is off. 
-            // Currently enforcing STRICT:
-            return res.json({ success: false, message: "INVALID ROUND SESSION" });
-        }
+        // Validate answer first
+        const GameService = require('./gameService');
+        const result = GameService.validateSubmission(round, stage, answer);
 
-        // Calculate Time Taken
+        // Calculate retry count for this stage
+        const { rows: previousAttempts } = await pool.query(
+            'SELECT COUNT(*) as count FROM submissions WHERE team_id = $1 AND round = $2 AND stage = $3 AND is_correct = FALSE',
+            [teamId, round, stage]
+        );
+        const retryCount = parseInt(previousAttempts[0]?.count || 0);
+        const retryPenalty = GameService.RETRY_PENALTY[Math.min(retryCount, 3)] || 0;
+
+        // Calculate Time Taken and Bonus
         let timeTaken = 0;
         let timeBonus = 0;
 
@@ -337,10 +339,10 @@ app.post('/api/game/submit', async (req, res) => {
             const endTime = new Date();
             timeTaken = Math.floor((endTime - startTime) / 1000); // Seconds
 
-            // Calculate Bonus (Example: Max 600s, Bonus = remaining * 0.5)
-            const TIME_LIMIT = 600; // 10 minutes generic limit
-            if (timeTaken < TIME_LIMIT) {
-                timeBonus = Math.floor((TIME_LIMIT - timeTaken) * 0.2); // 0.2 points per second saved
+            // Use round-specific time limit and multiplier
+            const roundConfig = GameService.ROUND_CONFIG[parseInt(round)];
+            if (roundConfig && timeTaken < roundConfig.timeLimit) {
+                timeBonus = Math.floor((roundConfig.timeLimit - timeTaken) * roundConfig.timeMultiplier);
             }
         } else {
             // First stage or missing record - Create 'in_progress' record now if missing to start timer for re-attempts
@@ -350,13 +352,16 @@ app.post('/api/game/submit', async (req, res) => {
             );
         }
 
-        // Validate answer
-        const GameService = require('./gameService');
-        const result = GameService.validateSubmission(round, stage, answer);
-
         // Calculate Total Points for this submission
-        const pointsAwarded = result.success ? (result.points || 0) : 0;
-        const totalPointsAwarded = pointsAwarded + (result.success ? timeBonus : 0);
+        const basePoints = result.success ? (result.points || 0) : 0;
+        const finalBonus = result.success ? timeBonus : 0;
+        const finalPenalty = result.success ? retryPenalty : 0;
+        const pointsAwarded = Math.max(0, basePoints + finalBonus - finalPenalty);
+        const totalPointsAwarded = pointsAwarded;
+
+        console.log(`[SCORING] Team ${teamId} Round ${round} Stage ${stage}:`);
+        console.log(`  Base: ${basePoints}, Time Bonus: ${finalBonus}, Retry Penalty: -${finalPenalty}, Total: ${totalPointsAwarded}`);
+        console.log(`  Retry Count: ${retryCount}, Time Taken: ${timeTaken}s`);
 
         // IDEMPOTENCY CHECK: Prevent double-submission causing phase skips
         const { rows: existingSubmissions } = await pool.query(
@@ -458,9 +463,17 @@ app.post('/api/game/submit', async (req, res) => {
 
             let nextRank = team.current_round; // Rank
             let nextStage = currentStage + 1;
+            let completionBonus = 0;
 
             if (currentStage >= maxStages) {
-                // Round Complete! Move to next Rank.
+                // Round Complete! Award completion bonus
+                const roundConfig = GameService.ROUND_CONFIG[gameRound];
+                if (roundConfig) {
+                    completionBonus = roundConfig.completionBonus;
+                    console.log(`[COMPLETION BONUS] Team ${teamId} completed Round ${gameRound}! Bonus: +${completionBonus} points`);
+                }
+
+                // Move to next Rank
                 nextRank = team.current_round + 1;
                 nextStage = 1;
                 console.log(`[PROGRESS] Team ${teamId} completed Game ${gameRound} (Rank ${team.current_round}). Moving to Rank ${nextRank}.`);
@@ -475,9 +488,10 @@ app.post('/api/game/submit', async (req, res) => {
 
             // Update Team Rank/Stage
             // Note: We update 'current_round' with nextRank (1,2,3,4,5...)
+            const finalScore = newScore + completionBonus;
             await pool.query(
                 'UPDATE teams SET total_score = $1, current_round = $2, current_stage = $3 WHERE team_id = $4',
-                [newScore, nextRank, nextStage, teamId]
+                [finalScore, nextRank, nextStage, teamId]
             );
 
             // Mark current stage as completed
