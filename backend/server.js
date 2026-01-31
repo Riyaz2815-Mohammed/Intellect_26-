@@ -749,20 +749,28 @@ app.post('/api/admin/create-team', async (req, res) => {
         let nextIndex = 0; // Default to 0 (Seq 1) if no teams exist
 
         if (lastTeamResult.length > 0) {
-            const lastSeq = lastTeamResult[0].round_sequence;
+            let lastSeq = lastTeamResult[0].round_sequence;
+
+            // Debug log
+            console.log(`[CREATE TEAM] Last created team had sequence: ${JSON.stringify(lastSeq)} (Type: ${typeof lastSeq[0]})`);
+
+            // Ensure lastSeq is array of numbers
+            if (Array.isArray(lastSeq)) {
+                lastSeq = lastSeq.map(n => Number(n));
+            }
 
             // Find which index the last sequence corresponds to
-            // We compare JSON stringified arrays for equality check
             const lastIndex = sequences.findIndex(seq => JSON.stringify(seq) === JSON.stringify(lastSeq));
 
             if (lastIndex !== -1) {
                 nextIndex = (lastIndex + 1) % 4; // Rotate to next
+            } else {
+                console.warn('[CREATE TEAM] Could not match last sequence to known patterns. Defaulting to 0.');
             }
         }
 
         const roundSequence = sequences[nextIndex];
-
-        console.log(`[CREATE TEAM] Last Seq Index Found: ${lastTeamResult.length > 0 ? 'Yes' : 'None'} -> New Assigned Index: ${nextIndex} (${roundSequence.join('→')})`);
+        console.log(`[CREATE TEAM] Assigning New Index: ${nextIndex} -> ${roundSequence.join('→')}`);
 
         // Insert team with round sequence
         console.log(`[CREATE TEAM] Inserting: ID=${teamId}, Name=${cleanTeamName}, Code=${cleanLoginCode}`);
