@@ -358,9 +358,26 @@ app.post('/api/game/submit', async (req, res) => {
         const pointsAwarded = result.success ? (result.points || 0) : 0;
         const totalPointsAwarded = pointsAwarded + (result.success ? timeBonus : 0);
 
-        // Log submission
+        // IDEMPOTENCY CHECK: Prevent double-submission causing phase skips
+        const { rows: existingSubmissions } = await pool.query(
+            'SELECT id FROM submissions WHERE team_id = $1 AND round = $2 AND stage = $3 AND is_correct = TRUE',
+            [teamId, round, stage]
+        );
+
+        if (existingSubmissions.length > 0) {
+            console.log(`[IDEMPOTENT] Team ${teamId} already completed Round ${round} Stage ${stage}. Returning success.`);
+            return res.json({
+                success: true,
+                message: result.message || 'Already completed',
+                points: 0, // No additional points for duplicate
+                nextStage: result.nextStage,
+                nextRound: result.nextRound
+            });
+        }
+
+        // Log submission (FIXED: video_time_taken instead of time_taken_seconds)
         await pool.query(
-            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, time_bonus, time_taken_seconds, error_message) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            'INSERT INTO submissions (team_id, round, stage, submitted_answer, is_correct, points_awarded, time_bonus, video_time_taken, error_message) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [teamId, round, stage, JSON.stringify(answer), result.success, pointsAwarded, timeBonus, timeTaken, result.message]
         );
 
@@ -551,7 +568,7 @@ app.get('/api/leaderboard/live', async (req, res) => {
         const { rows: stats } = await pool.query(`
             SELECT 
                 team_id, 
-                SUM(time_taken_seconds) as total_time,
+                SUM(video_time_taken) as total_time,
                 COUNT(CASE WHEN is_correct = FALSE THEN 1 END) as total_retries
             FROM submissions
             GROUP BY team_id
