@@ -627,6 +627,7 @@ const AdminPanel = () => {
                                                 <th>Team Name</th>
                                                 <th>Email</th>
                                                 <th>Login Code</th>
+                                                <th>Round Sequence</th>
                                                 <th>Round</th>
                                                 <th>Stage</th>
                                                 <th>Score</th>
@@ -641,6 +642,32 @@ const AdminPanel = () => {
                                                     <td><strong>{team.team_name}</strong></td>
                                                     <td>{team.email}</td>
                                                     <td><code style={{ color: '#00ff41' }}>{team.login_code}</code></td>
+                                                    <td>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            gap: '4px',
+                                                            alignItems: 'center',
+                                                            fontSize: '0.85rem',
+                                                            fontFamily: 'monospace',
+                                                            color: '#00ffcc'
+                                                        }}>
+                                                            {(team.round_sequence || [1, 2, 3, 4]).map((round, idx) => (
+                                                                <React.Fragment key={idx}>
+                                                                    <span style={{
+                                                                        background: idx === 0 ? '#00ff41' : 'rgba(0, 255, 204, 0.1)',
+                                                                        color: idx === 0 ? '#000' : '#00ffcc',
+                                                                        padding: '2px 6px',
+                                                                        borderRadius: '3px',
+                                                                        fontWeight: idx === 0 ? 'bold' : 'normal',
+                                                                        border: `1px solid ${idx === 0 ? '#00ff41' : '#00ffcc'}`
+                                                                    }}>
+                                                                        {round}
+                                                                    </span>
+                                                                    {idx < 3 && <span style={{ color: '#666' }}>→</span>}
+                                                                </React.Fragment>
+                                                            ))}
+                                                        </div>
+                                                    </td>
                                                     <td>
                                                         {team.current_round >= 100 ? (
                                                             <span style={{
