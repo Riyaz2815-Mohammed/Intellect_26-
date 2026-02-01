@@ -7,6 +7,7 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
     const [availableFragments, setAvailableFragments] = useState(prepareFragments(fragments));
     const [orderedFragments, setOrderedFragments] = useState([]);
     const [draggedItem, setDraggedItem] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Reset state when fragments prop changes (e.g. next stage)
     React.useEffect(() => {
@@ -74,9 +75,20 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
         setDraggedItem(null);
     };
 
-    const handleSubmitOrder = () => {
+    const handleSubmitOrder = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         const query = orderedFragments.map(f => f.text).join('\n');
-        onSubmit(query);
+
+        try {
+            // Add minimum delay to ensure PROCESSING state is visible
+            await Promise.all([
+                onSubmit(query),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleReset = () => {
@@ -214,6 +226,7 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                     onClick={handleReset}
                     className="btn btn-outline"
                     type="button"
+                    disabled={isSubmitting}
                 >
                     RESET
                 </button>
@@ -221,10 +234,39 @@ const DragDropSQL = ({ fragments, onSubmit }) => {
                     onClick={handleSubmitOrder}
                     className="btn btn-primary"
                     type="button"
-                    disabled={orderedFragments.length === 0}
+                    disabled={orderedFragments.length === 0 || isSubmitting}
+                    style={{
+                        opacity: isSubmitting ? 0.8 : 1,
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        background: isSubmitting ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                        transform: isSubmitting ? 'scale(0.98)' : 'scale(1)',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                        minWidth: '150px'
+                    }}
                 >
-                    SUBMIT QUERY
+                    {isSubmitting ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                            <span style={{
+                                display: 'inline-block',
+                                width: '12px',
+                                height: '12px',
+                                border: '2px solid #000',
+                                borderTopColor: 'transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 0.6s linear infinite'
+                            }}></span>
+                            PROCESSING...
+                        </span>
+                    ) : (
+                        'SUBMIT QUERY'
+                    )}
                 </button>
+                <style>{`
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                `}</style>
             </div>
         </div>
     );

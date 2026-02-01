@@ -161,8 +161,13 @@ export const PHASE2_QUESTIONS = [
         hint: 'Review your logical operators carefully.',
         validSQL: 'SELECT * FROM projects WHERE priority = "Critical" AND budget > 50000',
         validateFn: (input) => {
+            // Robust validation using Regex (handles spaces, quotes, case)
             const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized.includes('priority = "critical"') && normalized.includes('budget > 50000') && normalized.includes('and') && !normalized.includes(' or ');
+            const hasPriority = /priority\s*=\s*['"]critical['"]/.test(normalized);
+            const hasBudget = /budget\s*>\s*50000/.test(normalized);
+            const hasAnd = /\band\b/.test(normalized);
+            const noOr = !/\bor\b/.test(normalized); // Ensure OR is replaced by AND
+            return hasPriority && hasBudget && hasAnd && noOr;
         }
     },
     {
@@ -175,7 +180,9 @@ export const PHASE2_QUESTIONS = [
         validSQL: 'SELECT p.name, t.title FROM projects p JOIN tasks t ON p.id = t.project_id',
         validateFn: (input) => {
             const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized.includes('on p.id = t.project_id') || normalized.includes('on t.project_id = p.id');
+            // Check for explicit JOIN condition (either direction)
+            return /on\s+p\.id\s*=\s*t\.project_id/.test(normalized) ||
+                /on\s+t\.project_id\s*=\s*p\.id/.test(normalized);
         }
     },
     {
@@ -188,7 +195,10 @@ export const PHASE2_QUESTIONS = [
         validSQL: 'SELECT team_id, COUNT(*) FROM projects GROUP BY team_id',
         validateFn: (input) => {
             const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized.includes('group by team_id') && normalized.includes('count(*)');
+            // Check for GROUP BY clause and aggregate function
+            const hasGroupBy = /group\s+by\s+team_id/.test(normalized);
+            const hasCount = /count\s*\(\s*\*\s*\)/.test(normalized);
+            return hasGroupBy && hasCount;
         }
     },
     {
@@ -201,7 +211,10 @@ export const PHASE2_QUESTIONS = [
         validSQL: 'SELECT name FROM projects WHERE budget > (SELECT MAX(budget) FROM projects WHERE team_id = "T2")',
         validateFn: (input) => {
             const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized.includes('max(budget)') && normalized.includes('team_id = "t2"');
+            // Check for MAX() in subquery
+            const hasMax = /max\s*\(\s*budget\s*\)/.test(normalized);
+            const hasSubqueryFilter = /team_id\s*=\s*['"]t2['"]/.test(normalized);
+            return hasMax && hasSubqueryFilter;
         }
     },
     {
@@ -214,7 +227,10 @@ export const PHASE2_QUESTIONS = [
         validSQL: 'SELECT team_id, COUNT(*) FROM projects GROUP BY team_id HAVING COUNT(*) > 1',
         validateFn: (input) => {
             const normalized = input.trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized.includes('having count(*) > 1') && !normalized.includes('where count(*)');
+            // Must use HAVING, not WHERE for aggregate filtering
+            const hasHaving = /having\s+count\s*\(\s*\*\s*\)\s*>\s*1/.test(normalized);
+            const noWhereCount = !/where\s+count/.test(normalized);
+            return hasHaving && noWhereCount;
         }
     }
 ];

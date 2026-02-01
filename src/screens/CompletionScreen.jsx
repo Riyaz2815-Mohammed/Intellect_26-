@@ -18,40 +18,76 @@ const CompletionScreen = () => {
         return () => clearTimeout(timer);
     }, []);
 
+    // Helper function to format seconds into MM:SS
+    const formatTime = (seconds) => {
+        if (!seconds || seconds === 0) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     const fetchLeaderboard = async () => {
         try {
-            // Calculate total game time
-            const gameStartTime = localStorage.getItem('gameStartTime');
-            let totalGameTime = 0;
+            const SERVER_URL = import.meta.env.VITE_API_URL;
 
+            // Calculate total game time (Client-side estimate fallback)
+            // Calculate total game time (Client-side estimate fallback)
+            const gameStartTime = localStorage.getItem('gameStartTime');
+            const gameEndTime = localStorage.getItem('gameEndTime');
+
+            let clientCalculatedTime = 0;
             if (gameStartTime) {
                 const startTime = parseInt(gameStartTime);
-                const endTime = Date.now();
-                totalGameTime = Math.floor((endTime - startTime) / 1000); // Convert to seconds
-                console.log('[TIMER] Game completed!');
-                console.log('[TIMER] Start:', new Date(startTime).toISOString());
-                console.log('[TIMER] End:', new Date(endTime).toISOString());
-                console.log('[TIMER] Total Time:', formatTime(totalGameTime));
-
-                // Clear the timer
-                localStorage.removeItem('gameStartTime');
+                const endTime = gameEndTime ? parseInt(gameEndTime) : Date.now();
+                clientCalculatedTime = Math.floor((endTime - startTime) / 1000);
             }
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leaderboard/live`);
-            const data = await response.json();
+            // 1. Fetch Live Leaderboard
+            let lbData = [];
+            try {
+                const lbResponse = await fetch(`${SERVER_URL}/api/leaderboard/live`);
+                if (lbResponse.ok) {
+                    lbData = await lbResponse.json();
+                }
+            } catch (e) {
+                console.warn("Leaderboard fetch failed", e);
+            }
+            setLeaderboard(lbData.slice(0, 10)); // Top 10
 
-            setLeaderboard(data.slice(0, 10)); // Top 10
+            // 2. Fetch Personal Stats (Source of Truth)
+            let personalData = null;
+            if (state.teamId) {
+                try {
+                    const statsResponse = await fetch(`${SERVER_URL}/api/teams/${state.teamId}/state`);
+                    if (statsResponse.ok) {
+                        personalData = await statsResponse.json();
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch personal stats:", e);
+                }
+            }
 
-            // Find current team position and data
-            const position = data.findIndex(team => team.team_name === state.teamName) + 1;
-            const currentTeam = data.find(team => team.team_name === state.teamName);
+            // 3. Determine Rank/Position
+            const myTeamName = state.teamName?.toLowerCase() || '';
+            const lbIndex = lbData.findIndex(team => (team.name || team.team_name)?.toLowerCase() === myTeamName);
+            const rank = (lbIndex !== -1) ? (lbIndex + 1) : null;
+            const lbEntry = (lbIndex !== -1) ? lbData[lbIndex] : null;
 
-            setTeamPosition(position);
-            // Override total_time with our calculated global timer
+            setTeamPosition(rank);
+
+            // 4. Set Team Data for Display
+            // Fallback chain: Server Personal Data -> Leaderboard Entry -> State Context -> Defaults
             setTeamData({
-                ...currentTeam,
-                total_time: totalGameTime || currentTeam?.total_time || 0
+                name: state.teamName,
+                score: personalData?.score ?? lbEntry?.score ?? state.score,
+                retries: personalData?.retries ?? lbEntry?.retries ?? state.totalRetries ?? 0,
+                timeTaken: personalData?.timeTaken ?? lbEntry?.timeTaken ?? clientCalculatedTime ?? 0
             });
+
+            // Clear timer logic
+            if (gameStartTime) {
+                localStorage.removeItem('gameStartTime');
+            }
 
             setLoading(false);
         } catch (error) {
@@ -61,6 +97,7 @@ const CompletionScreen = () => {
     };
 
     const getMedalEmoji = (position) => {
+        if (!position) return '🏅';
         if (position === 1) return '🥇';
         if (position === 2) return '🥈';
         if (position === 3) return '🥉';
@@ -68,17 +105,11 @@ const CompletionScreen = () => {
     };
 
     const getPositionClass = (position) => {
+        if (!position) return '';
         if (position === 1) return 'gold';
         if (position === 2) return 'silver';
         if (position === 3) return 'bronze';
         return '';
-    };
-
-    const formatTime = (seconds) => {
-        if (!seconds || seconds === 0) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     if (loading) {
@@ -108,28 +139,28 @@ const CompletionScreen = () => {
                 </div>
                 <div className="team-result">
                     <div className={`position-badge ${getPositionClass(teamPosition)}`}>
-                        <span className="position-number">{getMedalEmoji(teamPosition)}</span>
+                        <span className="position-number">{teamPosition ? getMedalEmoji(teamPosition) : '#?'}</span>
                         <span className="position-label">
                             {teamPosition === 1 ? 'WINNER' :
-                                teamPosition <= 3 ? 'PODIUM FINISH' :
-                                    `${teamPosition}${teamPosition === 1 ? 'st' : teamPosition === 2 ? 'nd' : teamPosition === 3 ? 'rd' : 'th'} PLACE`}
+                                (teamPosition > 0 && teamPosition <= 3) ? 'PODIUM FINISH' :
+                                    (teamPosition ? `${teamPosition}${teamPosition === 1 ? 'st' : teamPosition === 2 ? 'nd' : teamPosition === 3 ? 'rd' : 'th'} PLACE` : 'RANK PENDING')}
                         </span>
                     </div>
                     <h2 className="team-name-display">{state.teamName}</h2>
                     <div className="stats-grid">
                         <div className="stat-card">
                             <div className="stat-icon">🏆</div>
-                            <div className="stat-value">{teamData?.total_score || state.score}</div>
+                            <div className="stat-value">{teamData?.score || state.score}</div>
                             <div className="stat-label">Total Points</div>
                         </div>
                         <div className="stat-card">
-                            <div className="stat-icon">⚡</div>
-                            <div className="stat-value">{state.round}</div>
-                            <div className="stat-label">Rounds Completed</div>
+                            <div className="stat-icon">🔄</div>
+                            <div className="stat-value">{teamData?.retries || 0}</div>
+                            <div className="stat-label">Total Retries</div>
                         </div>
                         <div className="stat-card">
                             <div className="stat-icon">⏱️</div>
-                            <div className="stat-value">{formatTime(teamData?.total_time || 0)}</div>
+                            <div className="stat-value">{formatTime(teamData?.timeTaken || 0)}</div>
                             <div className="stat-label">Total Time</div>
                         </div>
                     </div>
@@ -147,24 +178,30 @@ const CompletionScreen = () => {
                         <div className="col-rank">Rank</div>
                         <div className="col-team">Team Name</div>
                         <div className="col-score">Score</div>
+                        <div className="col-retries">Retries</div>
                         <div className="col-time">Time</div>
                     </div>
-                    {leaderboard.map((team, index) => (
+                    {leaderboard.length > 0 ? leaderboard.map((team, index) => (
                         <div
-                            key={team.team_id}
-                            className={`table-row ${team.team_name === state.teamName ? 'highlight' : ''} ${getPositionClass(index + 1)}`}
+                            key={team.id}
+                            className={`table-row ${team.name === state.teamName ? 'highlight' : ''} ${getPositionClass(index + 1)}`}
                         >
                             <div className="col-rank">
                                 <span className="rank-badge">{getMedalEmoji(index + 1)}</span>
                             </div>
                             <div className="col-team">
-                                {team.team_name}
-                                {team.team_name === state.teamName && <span className="you-badge">YOU</span>}
+                                {team.name}
+                                {team.name === state.teamName && <span className="you-badge">YOU</span>}
                             </div>
-                            <div className="col-score">{team.total_score}</div>
-                            <div className="col-time">{formatTime(team.total_time || 0)}</div>
+                            <div className="col-score">{team.score}</div>
+                            <div className="col-retries">{team.retries}</div>
+                            <div className="col-time">{formatTime(team.timeTaken || 0)}</div>
                         </div>
-                    ))}
+                    )) : (
+                        <div className="no-data-message">
+                            No leaderboard data available yet.
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -182,11 +219,6 @@ const CompletionScreen = () => {
                             <p>🎉 Amazing performance! You secured a podium finish! 🎉</p>
                         </div>
                     )}
-                    {teamPosition > 3 && (
-                        <div className="participant-message">
-                            <p>✨ Great effort! You completed all challenges! ✨</p>
-                        </div>
-                    )}
                 </div>
 
                 <div className="thank-you">
@@ -196,7 +228,10 @@ const CompletionScreen = () => {
 
                 <button
                     className="return-button"
-                    onClick={() => window.location.href = '/'}
+                    onClick={() => {
+                        window.location.href = '/';
+                        localStorage.clear();
+                    }}
                 >
                     Return to Lobby
                 </button>

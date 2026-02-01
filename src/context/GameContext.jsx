@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { GameService } from '../services/GameService';
+import { EmailService } from '../services/EmailService';
+import { API_BASE_URL } from '../config';
 
 // Round Shuffling Configuration
 // Round Shuffling Configuration (Rounds 1-4 are shuffled)
@@ -24,9 +27,26 @@ const initialState = {
     round: 0,
     stage: 0,
     score: 0,
+    retryCount: 0, // Track retries per stage
+    totalRetries: 0, // Track total retries for the entire game
     lastSubmission: null,
     error: null,
     roundSequence: JSON.parse(localStorage.getItem('roundSequence') || '[1,2,3,4]'), // Team-specific sequence from backend
+};
+
+// SCORING CONFIGURATION (Mirrors Backend)
+const ROUND_CONFIG = {
+    1: { basePoints: 100, timeLimit: 300, timeMultiplier: 0.3 },
+    2: { basePoints: 150, timeLimit: 600, timeMultiplier: 0.2 },
+    3: { basePoints: 200, timeLimit: 120, timeMultiplier: 0.5 }, // Memory
+    4: { basePoints: 250, timeLimit: 180, timeMultiplier: 0.4 }  // Advantage
+};
+
+const RETRY_PENALTY = {
+    0: 0,
+    1: 20,
+    2: 40,
+    3: 60 // Capped at 4th attempt (index 3)
 };
 
 // Actions
@@ -45,6 +65,7 @@ function gameReducer(state, action) {
     switch (action.type) {
         case ACTION.LOGIN:
             const roundSequence = action.payload.roundSequence || [1, 2, 3, 4];
+            // Timer logic moved to START_ROUND to ensure it starts only when gameplay begins.
             return {
                 ...state,
                 screen: 'LOBBY',
@@ -54,17 +75,27 @@ function gameReducer(state, action) {
                 round: action.payload.round || 0,
                 stage: action.payload.stage || 0,
                 score: action.payload.score || 0,
+                totalRetries: 0,
                 roundSequence: roundSequence,
                 error: null,
             };
         case ACTION.START_ROUND:
             // If round 0 (Start Game), pick the first round from assigned path
             const targetRound = action.payload.round === 0 ? state.roundSequence[0] : action.payload.round;
+
+            // Start Global Timer ONLY when the first round actually starts
+            const isFirstRound = targetRound === state.roundSequence[0];
+            if (isFirstRound && !localStorage.getItem('gameStartTime')) {
+                localStorage.setItem('gameStartTime', Date.now().toString());
+                console.log('Global Timer Started at:', new Date().toISOString());
+            }
+
             return {
                 ...state,
                 screen: 'GAME',
                 round: targetRound,
                 stage: 1,
+                retryCount: 0, // Reset retries on new round
                 roundEndsAt: Date.now() + (action.payload.duration || 600) * 1000,
                 error: null,
             };
@@ -73,12 +104,15 @@ function gameReducer(state, action) {
                 ...state,
                 stage: state.stage + 1,
                 score: state.score + action.payload.points,
+                retryCount: 0, // Reset retries on next stage
                 error: null,
             };
         case ACTION.SET_ERROR:
             return {
                 ...state,
                 error: action.payload,
+                retryCount: state.retryCount + 1, // Increment stage retry count
+                totalRetries: (state.totalRetries || 0) + 1, // Increment total game retries
             };
         case ACTION.ADMIN_OVERRIDE:
             return {
@@ -107,10 +141,6 @@ function gameReducer(state, action) {
             return state;
     }
 }
-
-import { GameService } from '../services/GameService';
-import { EmailService } from '../services/EmailService';
-import { API_BASE_URL } from '../config';
 
 const GameContext = createContext();
 
@@ -210,6 +240,22 @@ export function GameProvider({ children }) {
         const result = clientResult; // Trust client logic for immediate UI updates
 
         if (result.success) {
+            // CALCULATE SCORE
+            // Formula: Base + TimeBonus - RetryPenalty
+            let finalPoints = 0;
+            const config = ROUND_CONFIG[state.round] || { basePoints: 100, timeLimit: 300, timeMultiplier: 0.1 };
+
+            // 1. Base Points
+            const basePoints = config.basePoints;
+
+            // 2. Retry Penalty
+            const penalty = RETRY_PENALTY[Math.min(state.retryCount, 3)] || 60;
+
+            // Final Calculation
+            finalPoints = Math.max(0, result.points - penalty);
+
+            console.log(`[SCORING] Round ${state.round} Stage ${state.stage}: Base ${result.points} - Penalty ${penalty} (${state.retryCount} retries) = ${finalPoints}`);
+
             // ROUND COMPLETION HELPER
             const completeRound = (pointsToAdd = 0, msg = null) => {
                 const nextRound = getNextRound(state.round);
@@ -217,12 +263,17 @@ export function GameProvider({ children }) {
 
                 if (nextRound === 100) {
                     console.log('ALL ROUNDS COMPLETE. SHOWING WIN SCREEN.');
+
+                    // Stop the global timer
+                    const endTime = Date.now();
+                    localStorage.setItem('gameEndTime', endTime.toString());
+
                     dispatch({
                         type: ACTION.ADMIN_OVERRIDE,
                         payload: {
                             screen: 'SUCCESS', // New Win Screen
                             score: state.score + pointsToAdd,
-                            completionTime: new Date().toISOString(),
+                            completionTime: new Date(endTime).toISOString(),
                             isWinner: true
                         }
                     });
@@ -244,39 +295,33 @@ export function GameProvider({ children }) {
             };
 
             // CHECK ROUND COMPLETION CONDITIONS
-            if (state.round === 1 && state.stage === 5) return completeRound(result.points);
-            if (state.round === 2 && state.stage === 5) return completeRound(result.points);
+            if (state.round === 1 && state.stage === 5) return completeRound(finalPoints);
+            if (state.round === 2 && state.stage === 5) return completeRound(finalPoints);
 
             // ROUND 3 (FLASH ROUND) LOGIC
-            // Round 3 ends at Stage 5, then email sent, then Stage 6 (Code Entry)
             if (state.round === 3) {
-                // Note: Backend handles the email sending on submission of Stage 5
                 if (state.stage === 5) {
-                    // Backend sent email. Move to Stage 6.
-                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: finalPoints } });
                     return { success: true, message: 'FLASH DATA UPLOADED. CHECK SECURE CHANNEL.' };
                 }
                 if (state.stage === 6) {
-                    return completeRound(result.points, 'ACCESS GRANTED');
+                    return completeRound(finalPoints, 'ACCESS GRANTED');
                 }
             }
 
             // ROUND 4 SPECIFIC LOGIC
             if (state.round === 4) {
-                // Backend handles email sending for Phase 2
                 if (state.stage === 2) {
-                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+                    dispatch({ type: ACTION.NEXT_STAGE, payload: { points: finalPoints } });
                     return { success: true, message: 'SYSTEM PATCHED. CHECK EMAIL FOR ADVANTAGE KEY.' };
                 }
-
-                // After Phase 3 (Code Entry), complete round
                 if (state.stage === 3) {
-                    return completeRound(result.points, 'ADVANTAGE CODE VERIFIED');
+                    return completeRound(finalPoints, 'ADVANTAGE CODE VERIFIED');
                 }
             }
 
             // Normal Stage Progression
-            dispatch({ type: ACTION.NEXT_STAGE, payload: { points: result.points } });
+            dispatch({ type: ACTION.NEXT_STAGE, payload: { points: finalPoints } });
             return result;
         } else {
             dispatch({ type: ACTION.SET_ERROR, payload: result.message });

@@ -103,15 +103,14 @@ const WinScreen = ({ state }) => {
 };
 
 // Flash Challenge Component with Disclaimer and Retry Penalty
-const FlashChallengeContent = ({ levelData }) => {
+const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
     const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
     const [isLocked, setIsLocked] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(true);
-    const [retryCount, setRetryCount] = useState(0);
     const [adjustedDuration, setAdjustedDuration] = useState(levelData.flashDuration);
 
     useEffect(() => {
-        // Calculate adjusted duration based on retries (reduce 2s per retry)
+        // Calculate adjusted duration based on retries (reduce 2s per retry, minimum 5s)
         const newDuration = Math.max(5, levelData.flashDuration - (retryCount * 2));
         setAdjustedDuration(newDuration);
         setFlashTimeLeft(newDuration);
@@ -458,6 +457,7 @@ const TableQueryFlashContent = ({ levelData }) => {
 const Round4MultiQuestion = ({ levelData, onSubmitAll }) => {
     const [answers, setAnswers] = useState(['', '', '', '', '']);
     const [incorrectQuestions, setIncorrectQuestions] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleAnswerChange = (index, value) => {
         const newAnswers = [...answers];
@@ -465,8 +465,17 @@ const Round4MultiQuestion = ({ levelData, onSubmitAll }) => {
         setAnswers(newAnswers);
     };
 
-    const handleSubmit = () => {
-        onSubmitAll(answers, setIncorrectQuestions);
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await Promise.all([
+                onSubmitAll(answers, setIncorrectQuestions),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const renderTable = (table, tableName) => {
@@ -611,10 +620,35 @@ const Round4MultiQuestion = ({ levelData, onSubmitAll }) => {
             <button
                 onClick={handleSubmit}
                 className="btn btn-primary"
-                style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
-                disabled={answers.some(a => !a.trim())}
+                style={{
+                    fontSize: '1.1rem',
+                    padding: '1rem 2rem',
+                    opacity: isSubmitting ? 0.8 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    background: isSubmitting ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                    transform: isSubmitting ? 'scale(0.98)' : 'scale(1)',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    minWidth: '200px'
+                }}
+                disabled={answers.some(a => !a.trim()) || isSubmitting}
             >
-                SUBMIT ALL ANSWERS
+                {isSubmitting ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                        <span style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            border: '2px solid #000',
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 0.6s linear infinite'
+                        }}></span>
+                        PROCESSING...
+                    </span>
+                ) : (
+                    'SUBMIT ALL ANSWERS'
+                )}
             </button>
         </div>
     );
@@ -624,13 +658,23 @@ const Round4MultiQuestion = ({ levelData, onSubmitAll }) => {
 const QueryMatchingComponent = ({ levelData, onSubmit }) => {
     const [mapping, setMapping] = useState({});
     const [incorrectQueries, setIncorrectQueries] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleOutputSelect = (queryId, outputId) => {
         setMapping(prev => ({ ...prev, [queryId]: outputId }));
     };
 
-    const handleSubmit = () => {
-        onSubmit(mapping, setIncorrectQueries);
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await Promise.all([
+                onSubmit(mapping, setIncorrectQueries),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const renderTables = (tables) => {
@@ -828,13 +872,39 @@ const QueryMatchingComponent = ({ levelData, onSubmit }) => {
             </div>
 
             {/* Submit Button */}
+            {/* Submit Button */}
             <button
                 onClick={handleSubmit}
                 className="btn btn-primary"
-                style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
-                disabled={Object.keys(mapping).length !== levelData.queries.length}
+                style={{
+                    fontSize: '1.1rem',
+                    padding: '1rem 2rem',
+                    opacity: isSubmitting ? 0.8 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    background: isSubmitting ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                    transform: isSubmitting ? 'scale(0.98)' : 'scale(1)',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    minWidth: '200px'
+                }}
+                disabled={Object.keys(mapping).length !== levelData.queries.length || isSubmitting}
             >
-                SUBMIT MATCHES ({Object.keys(mapping).length}/{levelData.queries.length})
+                {isSubmitting ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                        <span style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            border: '2px solid #000',
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 0.6s linear infinite'
+                        }}></span>
+                        PROCESSING...
+                    </span>
+                ) : (
+                    `SUBMIT MATCHES (${Object.keys(mapping).length}/${levelData.queries.length})`
+                )}
             </button>
         </div>
     );
@@ -844,6 +914,7 @@ const QueryMatchingComponent = ({ levelData, onSubmit }) => {
 const QueryFixingComponent = ({ levelData, onSubmitAll }) => {
     const [answers, setAnswers] = useState(['', '', '', '', '']);
     const [incorrectQuestions, setIncorrectQuestions] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleAnswerChange = (index, value) => {
         const newAnswers = [...answers];
@@ -851,8 +922,17 @@ const QueryFixingComponent = ({ levelData, onSubmitAll }) => {
         setAnswers(newAnswers);
     };
 
-    const handleSubmit = () => {
-        onSubmitAll(answers, setIncorrectQuestions);
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await Promise.all([
+                onSubmitAll(answers, setIncorrectQuestions),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const renderTables = (tables) => {
@@ -1011,13 +1091,39 @@ const QueryFixingComponent = ({ levelData, onSubmitAll }) => {
             ))}
 
             {/* Submit Button */}
+            {/* Submit Button */}
             <button
                 onClick={handleSubmit}
                 className="btn btn-primary"
-                style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
-                disabled={answers.some(a => !a.trim())}
+                style={{
+                    fontSize: '1.1rem',
+                    padding: '1rem 2rem',
+                    opacity: isSubmitting ? 0.8 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    background: isSubmitting ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                    transform: isSubmitting ? 'scale(0.98)' : 'scale(1)',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    minWidth: '200px'
+                }}
+                disabled={answers.some(a => !a.trim()) || isSubmitting}
             >
-                SUBMIT ALL CORRECTIONS
+                {isSubmitting ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                        <span style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            border: '2px solid #000',
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 0.6s linear infinite'
+                        }}></span>
+                        PROCESSING...
+                    </span>
+                ) : (
+                    'SUBMIT ALL CORRECTIONS'
+                )}
             </button>
         </div>
     );
@@ -1030,6 +1136,7 @@ const GameScreen = () => {
     const [showRetry, setShowRetry] = useState(false);
     const [resetKey, setResetKey] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false); // Prevent double-submission
+    const [flashRetryCount, setFlashRetryCount] = useState(0); // Track Round 3 retries for time penalty
 
     // --- MISSION BRIEFING LOGIC ---
     const [showBriefing, setShowBriefing] = useState(false);
@@ -1051,6 +1158,7 @@ const GameScreen = () => {
         setLevelData(data);
         setInput('');
         setShowRetry(false);
+        setFlashRetryCount(0); // Reset retry count for new stage
     }, [state.round, state.stage, state.screen]);
 
     if (state.screen === 'SUCCESS') {
@@ -1063,9 +1171,18 @@ const GameScreen = () => {
 
         setIsSubmitting(true);
         try {
-            const result = await submitAnswer(input);
+            // Add minimum delay to ensure PROCESSING state is visible
+            const [result] = await Promise.all([
+                submitAnswer(input),
+                new Promise(resolve => setTimeout(resolve, 500)) // Minimum 500ms delay
+            ]);
+
             if (!result.success) {
                 setShowRetry(true);
+                // Increment retry count for Round 3 flash challenges
+                if (state.round === 3 && levelData?.type === 'FLASH_CHALLENGE') {
+                    setFlashRetryCount(prev => prev + 1);
+                }
             }
         } finally {
             setIsSubmitting(false);
@@ -1232,6 +1349,9 @@ const GameScreen = () => {
         );
     };
 
+    // START: Blocking Error Screen REMOVED to prevent unmounting/state loss on validation error.
+    // Errors are now handled inline by the components.
+    /*
     if (error) {
         return (
             <div className="container" style={{ textAlign: 'center', marginTop: '20vh' }}>
@@ -1251,6 +1371,8 @@ const GameScreen = () => {
             </div>
         );
     }
+    */
+    // END: Blocking Error Screen REMOVED
 
     // Show Briefing Overlay if active
     if (showBriefing && levelData) {
@@ -1323,7 +1445,7 @@ const GameScreen = () => {
         }
 
         if (levelData.type === 'FLASH_CHALLENGE') {
-            return <FlashChallengeContent levelData={levelData} />;
+            return <FlashChallengeContent levelData={levelData} retryCount={flashRetryCount} />;
         }
 
         if (levelData.type === 'TABLE_QUERY_FLASH') {

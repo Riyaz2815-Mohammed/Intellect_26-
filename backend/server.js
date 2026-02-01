@@ -266,21 +266,30 @@ app.get('/api/teams/:teamId/state', async (req, res) => {
 
         // --- RANDOM ROUND MAPPING ---
         // team.current_round is the RANK (1st round, 2nd round, etc.)
-        // We map it to the actual Game Round (1=SQL, 2=Data, etc.)
         const sequence = getRoundSequence(teamId);
-
-        // If rank > 5, they are done (Round 10 logic handled by admin override mainly)
-        // If valid rank (1-5), get mapped round. fallback to 5 if out of bounds.
         let displayRound = team.current_round;
         if (team.current_round <= 5) {
             displayRound = sequence[team.current_round - 1];
         }
 
+        // --- CALCULATE STATS ---
+        const { rows: stats } = await pool.query(`
+            SELECT 
+                SUM(video_time_taken) as total_time,
+                COUNT(CASE WHEN is_correct = FALSE THEN 1 END) as total_retries
+            FROM submissions
+            WHERE team_id = $1
+        `, [teamId]);
+
+        const teamStats = stats[0] || { total_time: 0, total_retries: 0 };
+
         res.json({
             round: displayRound, // Frontend sees the RANDOMIZED round type
             stage: team.current_stage,
             score: team.total_score,
-            rank: team.current_round // Useful for frontend to know "Progress: 1/5"
+            rank: team.current_round, // Useful for frontend to know "Progress: 1/5"
+            timeTaken: parseInt(teamStats.total_time) || 0,
+            retries: parseInt(teamStats.total_retries) || 0
         });
     } catch (error) {
         console.error('Get state error:', error);
