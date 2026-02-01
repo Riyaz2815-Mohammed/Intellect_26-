@@ -224,6 +224,7 @@ const CompletionScreen = () => {
                 <div className="thank-you">
                     <p>Thank you for participating in <strong>CODECRYPT - Intellect '26</strong></p>
                     <p className="event-credit">Organized by the Department of Computer Science</p>
+                    <p className="dev-credit" style={{ marginTop: '10px', color: '#00ffcc', fontWeight: 'bold' }}>Developed by Mohammed Riyaz A</p>
                 </div>
 
                 <button
