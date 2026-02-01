@@ -90,6 +90,7 @@ function gameReducer(state, action) {
             localStorage.removeItem('teamId');
             localStorage.removeItem('teamName');
             localStorage.removeItem('teamEmail');
+            localStorage.removeItem('gameStartTime'); // Clear global timer
             return {
                 screen: 'WELCOME',
                 teamId: null,

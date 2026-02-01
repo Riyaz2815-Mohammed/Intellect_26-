@@ -125,7 +125,15 @@ const LobbyScreen = () => {
 
                 <button
                     className="btn btn-primary"
-                    onClick={() => startRound(state.round || 0, 600)}
+                    onClick={() => {
+                        // Start global game timer on first mission start
+                        if (!localStorage.getItem('gameStartTime')) {
+                            const startTime = Date.now();
+                            localStorage.setItem('gameStartTime', startTime.toString());
+                            console.log('[TIMER] Game started at:', new Date(startTime).toISOString());
+                        }
+                        startRound(state.round || 0, 600);
+                    }}
                     style={{
                         padding: '1.2rem 3.5rem',
                         fontSize: '1.3rem',

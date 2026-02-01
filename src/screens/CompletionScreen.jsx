@@ -20,6 +20,23 @@ const CompletionScreen = () => {
 
     const fetchLeaderboard = async () => {
         try {
+            // Calculate total game time
+            const gameStartTime = localStorage.getItem('gameStartTime');
+            let totalGameTime = 0;
+
+            if (gameStartTime) {
+                const startTime = parseInt(gameStartTime);
+                const endTime = Date.now();
+                totalGameTime = Math.floor((endTime - startTime) / 1000); // Convert to seconds
+                console.log('[TIMER] Game completed!');
+                console.log('[TIMER] Start:', new Date(startTime).toISOString());
+                console.log('[TIMER] End:', new Date(endTime).toISOString());
+                console.log('[TIMER] Total Time:', formatTime(totalGameTime));
+
+                // Clear the timer
+                localStorage.removeItem('gameStartTime');
+            }
+
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leaderboard/live`);
             const data = await response.json();
 
@@ -30,7 +47,11 @@ const CompletionScreen = () => {
             const currentTeam = data.find(team => team.team_name === state.teamName);
 
             setTeamPosition(position);
-            setTeamData(currentTeam);
+            // Override total_time with our calculated global timer
+            setTeamData({
+                ...currentTeam,
+                total_time: totalGameTime || currentTeam?.total_time || 0
+            });
 
             setLoading(false);
         } catch (error) {
