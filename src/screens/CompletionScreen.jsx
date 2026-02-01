@@ -76,13 +76,33 @@ const CompletionScreen = () => {
             setTeamPosition(rank);
 
             // 4. Set Team Data for Display
-            // Fallback chain: Server Personal Data -> Leaderboard Entry -> State Context -> Defaults
+            // 4. Set Team Data for Display
+            // Score: Trust Backend (includes time bonuses)
+            // Retries: Trust Frontend (state.totalRetries) if higher, as backend validation is lenient
+            // Time: Trust Backend or Calculated
+
+            const srScore = personalData?.score ?? lbEntry?.score ?? state.score;
+            const srRetries = Math.max(personalData?.retries || 0, lbEntry?.retries || 0, state.totalRetries || 0);
+            const srTime = personalData?.timeTaken ?? lbEntry?.timeTaken ?? clientCalculatedTime ?? 0;
+
             setTeamData({
                 name: state.teamName,
-                score: personalData?.score ?? lbEntry?.score ?? state.score,
-                retries: personalData?.retries ?? lbEntry?.retries ?? state.totalRetries ?? 0,
-                timeTaken: personalData?.timeTaken ?? lbEntry?.timeTaken ?? clientCalculatedTime ?? 0
+                score: srScore,
+                retries: srRetries,
+                timeTaken: srTime
             });
+
+            // 5. Patch Leaderboard "You" Row for consistency
+            if (lbIndex !== -1) {
+                const updatedLb = [...lbData];
+                updatedLb[lbIndex] = {
+                    ...updatedLb[lbIndex],
+                    score: srScore,
+                    retries: srRetries,
+                    timeTaken: srTime
+                };
+                setLeaderboard(updatedLb);
+            }
 
             // Clear timer logic
             if (gameStartTime) {
@@ -223,7 +243,6 @@ const CompletionScreen = () => {
 
                 <div className="thank-you">
                     <p>Thank you for participating in <strong>CODECRYPT - Intellect '26</strong></p>
-                    <p className="event-credit">Organized by the Department of Computer Science</p>
                     <p className="dev-credit" style={{ marginTop: '10px', color: '#00ffcc', fontWeight: 'bold' }}>Developed by Mohammed Riyaz A</p>
                 </div>
 
