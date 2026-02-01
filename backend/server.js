@@ -328,28 +328,36 @@ app.post('/api/game/submit', async (req, res) => {
         let timeTaken = 0;
         let timeBonus = 0;
 
-        // Get start time for this stage
+        // Get or create start time for this stage
         const { rows: progress } = await pool.query(
             'SELECT started_at FROM team_progress WHERE team_id = $1 AND round = $2 AND stage = $3',
             [teamId, round, stage]
         );
 
+        let startTime;
         if (progress.length > 0 && progress[0].started_at) {
-            const startTime = new Date(progress[0].started_at);
-            const endTime = new Date();
-            timeTaken = Math.floor((endTime - startTime) / 1000); // Seconds
-
-            // Use round-specific time limit and multiplier
-            const roundConfig = GameService.ROUND_CONFIG[parseInt(round)];
-            if (roundConfig && timeTaken < roundConfig.timeLimit) {
-                timeBonus = Math.floor((roundConfig.timeLimit - timeTaken) * roundConfig.timeMultiplier);
-            }
+            // Timer already started - use existing start time
+            startTime = new Date(progress[0].started_at);
         } else {
-            // First stage or missing record - Create 'in_progress' record now if missing to start timer for re-attempts
+            // First attempt - start timer NOW and use it for this submission
+            startTime = new Date();
             await pool.query(
-                'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES ($1, $2, $3, \'in_progress\', NOW()) ON CONFLICT (team_id, round, stage) DO NOTHING',
-                [teamId, round, stage]
+                `INSERT INTO team_progress (team_id, round, stage, status, started_at) 
+                 VALUES ($1, $2, $3, 'in_progress', $4) 
+                 ON CONFLICT (team_id, round, stage) 
+                 DO UPDATE SET started_at = COALESCE(team_progress.started_at, $4)`,
+                [teamId, round, stage, startTime]
             );
+        }
+
+        // Calculate time taken
+        const endTime = new Date();
+        timeTaken = Math.floor((endTime - startTime) / 1000); // Seconds
+
+        // Calculate time bonus
+        const roundConfig = GameService.ROUND_CONFIG[parseInt(round)];
+        if (roundConfig && timeTaken < roundConfig.timeLimit) {
+            timeBonus = Math.floor((roundConfig.timeLimit - timeTaken) * roundConfig.timeMultiplier);
         }
 
         // Calculate Total Points for this submission
@@ -496,8 +504,8 @@ app.post('/api/game/submit', async (req, res) => {
 
             // Mark current stage as completed
             await pool.query(
-                'UPDATE team_progress SET status = \'completed\', completed_at = NOW(), time_taken_seconds = $1 WHERE team_id = $2 AND round = $3 AND stage = $4',
-                [timeTaken, teamId, gameRound, currentStage]
+                'UPDATE team_progress SET status = \'completed\', completed_at = NOW() WHERE team_id = $1 AND round = $2 AND stage = $3',
+                [teamId, gameRound, currentStage]
             );
 
             // Initialize NEXT stage (to start timer)
