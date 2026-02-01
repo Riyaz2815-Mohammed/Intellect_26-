@@ -82,7 +82,8 @@ const CompletionScreen = () => {
             // Time: Trust Backend or Calculated
 
             const srScore = personalData?.score ?? lbEntry?.score ?? state.score;
-            const srRetries = Math.max(personalData?.retries || 0, lbEntry?.retries || 0, state.totalRetries || 0);
+            // Retries: Prioritize Server Data (Source of Truth) as local state appeared inflated (41 vs 1)
+            const srRetries = personalData?.retries ?? lbEntry?.retries ?? state.totalRetries ?? 0;
             const srTime = personalData?.timeTaken ?? lbEntry?.timeTaken ?? clientCalculatedTime ?? 0;
 
             setTeamData({
