@@ -579,8 +579,14 @@ app.post('/api/game/submit', async (req, res) => {
 
             if (nextRank !== team.current_round) {
                 // Calculate what the next game round will be
-                const sequence = getRoundSequence(teamId);
-                if (nextRank <= 5) {
+                // Get team's round sequence to find next round
+                const { rows: teamDataRows } = await pool.query(
+                    'SELECT round_sequence FROM teams WHERE team_id = $1',
+                    [teamId]
+                );
+                const sequence = teamDataRows[0]?.round_sequence || [1, 2, 3, 4];
+
+                if (nextRank <= sequence.length) {
                     nextGameRound = sequence[nextRank - 1];
                 } else {
                     nextGameRound = 999; // Finished
@@ -588,7 +594,7 @@ app.post('/api/game/submit', async (req, res) => {
                 }
             }
 
-            if (nextGameRound !== 999) {
+            if (nextGameRound && nextGameRound !== 999) {
                 await pool.query(
                     'INSERT INTO team_progress (team_id, round, stage, status, started_at) VALUES ($1, $2, $3, \'in_progress\', NOW()) ON CONFLICT (team_id, round, stage) DO NOTHING',
                     [teamId, nextGameRound, nextStage]
