@@ -119,8 +119,7 @@ const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
     }, [levelData, retryCount]);
 
     useEffect(() => {
-        if (flashTimeLeft <= 0) {
-            setIsLocked(true);
+        if (showDisclaimer || isLocked || flashTimeLeft <= 0) {
             return;
         }
 
@@ -129,7 +128,7 @@ const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [flashTimeLeft]);
+    }, [flashTimeLeft, showDisclaimer, isLocked]);
 
     const renderFlashData = () => {
         if (levelData.subType === 'TABLE_FLASH') {
@@ -346,18 +345,23 @@ const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
 };
 
 // Table Query Flash Component - Table stays visible, query flashes
-const TableQueryFlashContent = ({ levelData }) => {
+const TableQueryFlashContent = ({ levelData, retryCount = 0 }) => {
     const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
     const [isQueryLocked, setIsQueryLocked] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(true);
+    const [adjustedDuration, setAdjustedDuration] = useState(levelData.flashDuration);
 
     useEffect(() => {
-        setFlashTimeLeft(levelData.flashDuration);
+        // Calculate adjusted duration based on retries (reduce 2s per retry, minimum 5s)
+        const newDuration = Math.max(5, levelData.flashDuration - (retryCount * 2));
+        setAdjustedDuration(newDuration);
+        setFlashTimeLeft(newDuration);
         setIsQueryLocked(false);
-    }, [levelData]);
+        setShowDisclaimer(true);
+    }, [levelData, retryCount]);
 
     useEffect(() => {
-        if (flashTimeLeft <= 0) {
-            setIsQueryLocked(true);
+        if (showDisclaimer || isQueryLocked || flashTimeLeft <= 0) {
             return;
         }
 
@@ -366,6 +370,12 @@ const TableQueryFlashContent = ({ levelData }) => {
         }, 1000);
 
         return () => clearTimeout(timer);
+    }, [flashTimeLeft, showDisclaimer, isQueryLocked]);
+
+    useEffect(() => {
+        if (flashTimeLeft <= 0) {
+            setIsQueryLocked(true);
+        }
     }, [flashTimeLeft]);
 
     const renderTable = (tableData) => {
@@ -402,52 +412,137 @@ const TableQueryFlashContent = ({ levelData }) => {
 
     return (
         <div>
-            {/* Query Flash Section */}
-            {!isQueryLocked ? (
-                <div className="animate-fade-in">
-                    <div style={{
-                        background: 'rgba(255, 204, 0, 0.1)',
-                        border: '2px solid var(--accent-warning)',
-                        padding: '1rem',
-                        marginBottom: '1.5rem',
-                        textAlign: 'center',
-                        fontSize: '2rem',
-                        fontFamily: 'var(--font-code)',
-                        color: 'var(--accent-warning)',
-                        fontWeight: 'bold'
-                    }}>
-                        MEMORIZE QUERY: {flashTimeLeft}s
-                    </div>
-                    <pre style={{
-                        background: 'var(--bg-tertiary)',
-                        padding: '1.5rem',
-                        borderRadius: 'var(--radius-md)',
-                        fontFamily: 'var(--font-code)',
-                        fontSize: '1.1rem',
-                        border: '2px solid var(--accent-primary)',
-                        whiteSpace: 'pre-wrap',
-                        marginBottom: '1.5rem'
-                    }}>
-                        {levelData.flashData}
-                    </pre>
-                </div>
-            ) : (
+            {/* Disclaimer Popup */}
+            {showDisclaimer && (
                 <div style={{
-                    background: 'rgba(255, 51, 51, 0.1)',
-                    border: '2px solid var(--accent-error)',
-                    padding: '1.5rem',
-                    marginBottom: '1.5rem',
-                    borderRadius: 'var(--radius-md)'
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.95)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'fadeIn 0.3s ease-in'
                 }}>
-                    <h3 style={{ color: 'var(--accent-error)', marginBottom: '0.5rem' }}>🔒 QUERY LOCKED</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{levelData.prompt}</p>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                        HINT: {levelData.hint}
-                    </p>
+                    <div style={{
+                        background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+                        border: '3px solid var(--accent-warning)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '2.5rem',
+                        maxWidth: '600px',
+                        textAlign: 'center',
+                        boxShadow: '0 0 50px rgba(255, 204, 0, 0.3)'
+                    }}>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚠️</div>
+                        <h2 style={{ color: 'var(--accent-warning)', marginBottom: '1.5rem', fontSize: '1.8rem' }}>
+                            MEMORY CHALLENGE AHEAD
+                        </h2>
+                        <div style={{
+                            background: 'rgba(255, 204, 0, 0.1)',
+                            padding: '1.5rem',
+                            borderRadius: 'var(--radius-md)',
+                            marginBottom: '1.5rem',
+                            border: '1px solid rgba(255, 204, 0, 0.3)'
+                        }}>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                                📑 The query will be visible for <strong style={{ color: 'var(--accent-warning)' }}>{adjustedDuration} seconds</strong>
+                            </p>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                                🔒 After that, the query will be <strong style={{ color: 'var(--accent-error)' }}>LOCKED</strong>
+                            </p>
+                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: '1.6' }}>
+                                🧠 Study the query carefully. You will need to apply it to the table below!
+                            </p>
+                        </div>
+                        {retryCount > 0 && (
+                            <div style={{
+                                background: 'rgba(255, 51, 51, 0.1)',
+                                border: '1px solid var(--accent-error)',
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md)',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <p style={{ color: 'var(--accent-error)', fontSize: '0.95rem' }}>
+                                    ⚠️ RETRY PENALTY: Time reduced by {retryCount * 2}s (Attempt #{retryCount + 1})
+                                </p>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setShowDisclaimer(false)}
+                            style={{
+                                background: 'var(--accent-warning)',
+                                color: '#000',
+                                border: 'none',
+                                padding: '1rem 3rem',
+                                fontSize: '1.2rem',
+                                fontWeight: 'bold',
+                                borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px'
+                            }}
+                        >
+                            I'M READY
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* Table Always Visible */}
+            {/* Query Flash Section */}
+            {!showDisclaimer && (
+                <div>
+                    {!isQueryLocked ? (
+                        <div className="animate-fade-in">
+                            <div style={{
+                                background: 'rgba(255, 204, 0, 0.1)',
+                                border: '2px solid var(--accent-warning)',
+                                padding: '1rem',
+                                marginBottom: '1.5rem',
+                                textAlign: 'center',
+                                fontSize: '2rem',
+                                fontFamily: 'var(--font-code)',
+                                color: 'var(--accent-warning)',
+                                fontWeight: 'bold'
+                            }}>
+                                MEMORIZE QUERY: {flashTimeLeft}s
+                            </div>
+                            <pre style={{
+                                background: 'var(--bg-tertiary)',
+                                padding: '1.5rem',
+                                borderRadius: 'var(--radius-md)',
+                                fontFamily: 'var(--font-code)',
+                                fontSize: '1.1rem',
+                                border: '2px solid var(--accent-primary)',
+                                whiteSpace: 'pre-wrap',
+                                marginBottom: '1.5rem'
+                            }}>
+                                {levelData.flashData}
+                            </pre>
+                        </div>
+                    ) : (
+                        <div style={{
+                            background: 'rgba(255, 51, 51, 0.1)',
+                            border: '2px solid var(--accent-error)',
+                            padding: '1.5rem',
+                            marginBottom: '1.5rem',
+                            borderRadius: 'var(--radius-md)'
+                        }}>
+                            <h3 style={{ color: 'var(--accent-error)', marginBottom: '0.5rem' }}>🔒 QUERY LOCKED</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{levelData.prompt}</p>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                HINT: {levelData.hint}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Table Always Visible (Wait for disclaimer if desired, but user said 'when this pop up shows... timer is started', implying the background content might be visible or they just want the timer stopped until 'ready') */}
+            {/* Keeping table visible for reference as per original design, but the flash data is what matters */}
             {renderTable(levelData.tableData)}
         </div>
     );
@@ -1449,7 +1544,7 @@ const GameScreen = () => {
         }
 
         if (levelData.type === 'TABLE_QUERY_FLASH') {
-            return <TableQueryFlashContent levelData={levelData} />;
+            return <TableQueryFlashContent levelData={levelData} retryCount={flashRetryCount} />;
         }
 
         if (levelData.type === 'DATA_ANALYSIS') {

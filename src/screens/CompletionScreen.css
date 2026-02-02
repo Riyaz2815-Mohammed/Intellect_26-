@@ -1,10 +1,28 @@
 .completion-screen {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
-    color: #00ff41;
-    padding: 40px 20px;
+    background: #050505;
+    background-image:
+        radial-gradient(at 0% 0%, rgba(0, 255, 65, 0.15) 0, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(0, 243, 255, 0.1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(255, 51, 51, 0.05) 0, transparent 50%);
+    color: #ffffff;
+    padding: 60px 20px;
     overflow-x: hidden;
     position: relative;
+    font-family: 'Inter', sans-serif;
+}
+
+.completion-screen::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .completion-screen.loading {
@@ -191,13 +209,19 @@
 
 /* Team Result Section */
 .team-result {
-    background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, rgba(0, 255, 204, 0.05) 100%);
-    border: 2px solid #00ff41;
-    border-radius: 20px;
-    padding: 40px;
-    max-width: 800px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 50px;
+    max-width: 900px;
     margin: 0 auto;
-    box-shadow: 0 0 30px rgba(0, 255, 65, 0.3);
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    z-index: 2;
 }
 
 .position-badge {
@@ -261,22 +285,25 @@
 }
 
 .stat-card {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #00ff41;
-    border-radius: 10px;
-    padding: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
     text-align: center;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 20px rgba(0, 255, 65, 0.3);
+    transform: translateY(-8px);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 255, 65, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 255, 65, 0.15);
 }
 
 .stat-icon {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
+    font-size: 2rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.3));
 }
 
 .stat-value {
@@ -314,10 +341,12 @@
 }
 
 .leaderboard-table {
-    background: rgba(0, 0, 0, 0.6);
-    border: 2px solid #00ff41;
-    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
     overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 .table-header {
@@ -465,6 +494,62 @@
     box-shadow: 0 5px 30px rgba(0, 255, 65, 0.5);
 }
 
+/* Performance Breakdown Section */
+.breakdown-section {
+    max-width: 900px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.breakdown-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: fadeInUp 0.6s ease forwards;
+    opacity: 0;
+}
+
+.breakdown-card .round-label {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.breakdown-card .round-score {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #00ff41;
+}
+
+.breakdown-card .round-time {
+    font-size: 0.9rem;
+    color: #00f3ff;
+}
+
+/* Animations for Staggered Reveal */
+.visible-content {
+    animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .glitch {
@@ -509,5 +594,9 @@
     .participant-message {
         font-size: 1.2rem;
         padding: 20px;
+    }
+
+    .breakdown-section {
+        grid-template-columns: 1fr 1fr;
     }
 }

@@ -208,6 +208,7 @@ export function GameProvider({ children }) {
 
         // 2. Send to Backend (Async - fire and forget for speed, or await for sync)
         // We await here to ensure DB consistency
+        let backendResult = null;
         try {
             if (state.teamId) {
                 // Determine 'round' for backend (Backend expects integer)
@@ -227,7 +228,7 @@ export function GameProvider({ children }) {
                     console.error(`[BACKEND] Submission failed: ${response.status}`);
                     // Still continue with client-side validation
                 } else {
-                    const backendResult = await response.json();
+                    backendResult = await response.json();
                     console.log('[BACKEND] Submission recorded:', backendResult);
                 }
             }
@@ -251,8 +252,14 @@ export function GameProvider({ children }) {
             // 2. Retry Penalty
             const penalty = RETRY_PENALTY[Math.min(state.retryCount, 3)] || 60;
 
-            // Final Calculation
+            // Final Calculation (Frontend Estimate - now replaced by Backend Truth if available)
             finalPoints = Math.max(0, result.points - penalty);
+
+            if (state.teamId && typeof backendResult?.newTotalScore === 'number') {
+                console.log(`[SCORING] Syncing with Backend: ${backendResult.newTotalScore}`);
+                finalPoints = backendResult.newTotalScore - state.score; // Diff for animation/logic if needed
+                // Update state score directly from backend source of truth
+            }
 
             console.log(`[SCORING] Round ${state.round} Stage ${state.stage}: Base ${result.points} - Penalty ${penalty} (${state.retryCount} retries) = ${finalPoints}`);
 
@@ -260,6 +267,11 @@ export function GameProvider({ children }) {
             const completeRound = (pointsToAdd = 0, msg = null) => {
                 const nextRound = getNextRound(state.round);
                 const nextStage = 1;
+
+                // Use backend total score if available, otherwise fallback to local calculation
+                const finalTotalScore = (typeof backendResult?.newTotalScore === 'number')
+                    ? backendResult.newTotalScore
+                    : state.score + pointsToAdd;
 
                 if (nextRound === 100) {
                     console.log('ALL ROUNDS COMPLETE. SHOWING WIN SCREEN.');
@@ -272,7 +284,7 @@ export function GameProvider({ children }) {
                         type: ACTION.ADMIN_OVERRIDE,
                         payload: {
                             screen: 'SUCCESS', // New Win Screen
-                            score: state.score + pointsToAdd,
+                            score: finalTotalScore,
                             completionTime: new Date(endTime).toISOString(),
                             isWinner: true
                         }
@@ -286,7 +298,7 @@ export function GameProvider({ children }) {
                     payload: {
                         round: nextRound,
                         stage: nextStage,
-                        score: state.score + pointsToAdd,
+                        score: finalTotalScore,
                         screen: 'LOBBY', // Always go to lobby between rounds
                         error: null
                     }
@@ -321,7 +333,29 @@ export function GameProvider({ children }) {
             }
 
             // Normal Stage Progression
-            dispatch({ type: ACTION.NEXT_STAGE, payload: { points: finalPoints } });
+            // Use backend total score if available, otherwise local addition
+            const finalTotalScore = (typeof backendResult?.newTotalScore === 'number')
+                ? backendResult.newTotalScore
+                : state.score + finalPoints;
+
+            dispatch({
+                type: ACTION.NEXT_STAGE,
+                payload: {
+                    points: finalPoints,
+                    overrideScore: finalTotalScore // Add support for absolute score setting in reducer if needed, or rely on delta logic being updated
+                }
+            });
+            // HACK: To ensure score is exact, we might need a separate action or update NEXT_STAGE to accept absolute score
+            // For now, let's assume if we pass the delta 'points', reducer adds it. 
+            // Better: Dispatch ADMIN_OVERRIDE-like update for score to be perfect?
+            // Actually, let's update NEXT_STAGE reducer to handle this cleaner later, but for now:
+            if (typeof backendResult?.newTotalScore === 'number') {
+                dispatch({
+                    type: ACTION.ADMIN_OVERRIDE,
+                    payload: { score: backendResult.newTotalScore }
+                });
+            }
+
             return result;
         } else {
             dispatch({ type: ACTION.SET_ERROR, payload: result.message });

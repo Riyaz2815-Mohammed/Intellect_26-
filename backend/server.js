@@ -272,27 +272,72 @@ app.get('/api/teams/:teamId/state', async (req, res) => {
             displayRound = sequence[team.current_round - 1];
         }
 
-        // --- CALCULATE STATS ---
-        const { rows: stats } = await pool.query(`
-            SELECT 
-                SUM(video_time_taken) as total_time,
-                COUNT(CASE WHEN is_correct = FALSE THEN 1 END) as total_retries
-            FROM submissions
-            WHERE team_id = $1
-        `, [teamId]);
+        // --- CALCULATE REAL RANK ---
+        // Fetch all active teams for rank determination
+        const { rows: allTeams } = await pool.query(`
+            SELECT team_id, total_score, current_round as progress, current_stage as stage
+            FROM teams WHERE is_active = TRUE
+        `);
 
-        const teamStats = stats[0] || { total_time: 0, total_retries: 0 };
+        // Get total time stats for tie-breaking
+        const { rows: allStats } = await pool.query(`
+            SELECT team_id, SUM(video_time_taken) as total_time
+            FROM submissions GROUP BY team_id
+        `);
+
+        const allStatsMap = allStats.reduce((acc, row) => {
+            acc[row.team_id] = parseInt(row.total_time) || 0;
+            return acc;
+        }, {});
+
+        // Sort just like leaderboard
+        const sortedTeams = allTeams.map(t => ({
+            id: t.team_id,
+            score: t.total_score,
+            progress: t.progress,
+            stage: t.stage,
+            timeTaken: allStatsMap[t.team_id] || 0
+        })).sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            if (b.progress !== a.progress) return b.progress - a.progress;
+            if (b.stage !== a.stage) return b.stage - a.stage;
+            return a.timeTaken - b.timeTaken;
+        });
+
+        const myRank = sortedTeams.findIndex(t => String(t.id) === String(teamId)) + 1;
 
         res.json({
-            round: displayRound, // Frontend sees the RANDOMIZED round type
+            round: displayRound,
             stage: team.current_stage,
             score: team.total_score,
-            rank: team.current_round, // Useful for frontend to know "Progress: 1/5"
-            timeTaken: parseInt(teamStats.total_time) || 0,
-            retries: parseInt(teamStats.total_retries) || 0
+            rank: myRank > 0 ? myRank : team.current_round,
+            timeTaken: allStatsMap[teamId] || 0
         });
     } catch (error) {
         console.error('Get state error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get Team Breakdown
+app.get('/api/teams/:teamId/breakdown', async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const { rows: breakdown } = await pool.query(`
+            SELECT 
+                round,
+                SUM(points_awarded) as score,
+                SUM(video_time_taken) as time_taken,
+                COUNT(*) FILTER (WHERE is_correct = TRUE) as correct_stages
+            FROM submissions 
+            WHERE team_id = $1
+            GROUP BY round
+            ORDER BY round ASC
+        `, [teamId]);
+
+        res.json(breakdown);
+    } catch (error) {
+        console.error('Get breakdown error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -451,7 +496,18 @@ app.post('/api/game/submit', async (req, res) => {
                                 console.error(`[EMAIL ERROR] No code found for Team ${teamId} Round ${nextRound}`);
                             }
                         } else {
-                            console.log(`[EMAIL SKIP] Round 3 was final round for Team ${teamId}, no email needed`);
+                            // Round 3 was the FINAL round.
+                            // User Request: Still send the "Advantage Email", but with the FINAL completion code.
+                            console.log(`[EMAIL] Round 3 was final round for Team ${teamId}. Sending Final Advantage Email.`);
+
+                            const finalCode = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+                            const emailResult = await sendAdvantageCodeEmail(teamData.email, teamData.team_name, finalCode, "FINAL");
+
+                            if (emailResult && emailResult.success) {
+                                console.log(`✅ [EMAIL SUCCESS] Final Advantage code sent to ${teamData.email}`);
+                            } else {
+                                console.error(`❌ [EMAIL FAILED] ${emailResult?.error || 'Unknown error'}`);
+                            }
                         }
                     }
                 }
@@ -528,6 +584,7 @@ app.post('/api/game/submit', async (req, res) => {
                     nextGameRound = sequence[nextRank - 1];
                 } else {
                     nextGameRound = 999; // Finished
+                    console.log(`[GAME OVER] Team ${teamId} has finished all rounds!`);
                 }
             }
 
@@ -543,7 +600,8 @@ app.post('/api/game/submit', async (req, res) => {
             ...result,
             timeTaken,
             timeBonus: result.success ? timeBonus : 0,
-            totalPoints: totalPointsAwarded
+            totalPoints: totalPointsAwarded,
+            newTotalScore: result.success ? finalScore : team.total_score // Return authoritative score
         });
     } catch (error) {
         console.error('Submit error:', error);
@@ -618,46 +676,28 @@ app.get('/api/leaderboard/live', async (req, res) => {
             WHERE t.is_active = TRUE
         `);
 
-        // Fetch additional stats for tie-breaking or detailed scoring
-        // e.g., Total time taken across all completed stages
+        // Get total time stats for tie-breaking
         const { rows: stats } = await pool.query(`
-            SELECT 
-                team_id, 
-                SUM(video_time_taken) as total_time,
-                COUNT(CASE WHEN is_correct = FALSE THEN 1 END) as total_retries
-            FROM submissions
-            GROUP BY team_id
+            SELECT team_id, SUM(video_time_taken) as total_time
+            FROM submissions GROUP BY team_id
         `);
 
-        // Map stats to teams
         const statsMap = stats.reduce((acc, row) => {
-            acc[row.team_id] = {
-                totalTime: parseInt(row.total_time) || 0,
-                retries: parseInt(row.total_retries) || 0
-            };
+            acc[row.team_id] = parseInt(row.total_time) || 0;
             return acc;
         }, {});
 
         // Construct Leaderboard Data
         const leaderboard = teams.map(team => {
-            const teamStats = statsMap[team.team_id] || { totalTime: 0, retries: 0 };
-
-            // Calculate a composite score for sorting if scores are equal
-            // Primary: Total Score (Higher is better)
-            // Secondary: Progress (Higher Round/Stage is better)
-            // Tertiary: Time Taken (Lower is better)
-
-            // Note: In our system, 'current_round' is the 'Level' (1-4). 
-            // If they finish, current_round might be > 4 or marked via a flag.
+            const teamTotalTime = statsMap[team.team_id] || 0;
 
             return {
                 id: team.team_id,
                 name: team.team_name,
                 score: team.total_score,
-                progress: team.current_round, // e.g. 3 means they are on their 3rd assigned round
+                progress: team.current_round,
                 stage: team.current_stage,
-                timeTaken: teamStats.totalTime,
-                retries: teamStats.retries
+                timeTaken: teamTotalTime
             };
         });
 
@@ -701,9 +741,15 @@ app.get('/api/admin/leaderboard', async (req, res) => {
 // Get All Teams
 app.get('/api/admin/teams', async (req, res) => {
     try {
-        const { rows: teams } = await pool.query(
-            'SELECT team_id, team_name, email, login_code, current_round, current_stage, total_score, is_active, round_sequence FROM teams ORDER BY total_score DESC'
-        );
+        const { rows: teams } = await pool.query(`
+            SELECT 
+                t.team_id, t.team_name, t.email, t.login_code, 
+                t.current_round, t.current_stage, t.total_score, t.is_active, 
+                t.round_sequence,
+                COALESCE((SELECT SUM(video_time_taken) FROM submissions WHERE team_id = t.team_id), 0) as total_time
+            FROM teams t 
+            ORDER BY total_score DESC, current_round DESC, current_stage DESC, total_time ASC
+        `);
         res.json(teams);
     } catch (error) {
         console.error('Get teams error:', error);
@@ -1061,8 +1107,32 @@ async function sendAdvantageCodeEmail(email, teamName, code, roundNumber = 4) {
                 <div style="background: linear-gradient(90deg, #333, #000); padding: 20px; text-align: center; border: 1px solid #ffcc00; margin: 20px 0;">
                     <h1 style="color: #ffcc00; font-size: 40px; margin: 0; letter-spacing: 5px;">${code}</h1>
                     <p style="color: #ffcc00; font-size: 14px; margin-top: 15px;">⚠️ Enter this code to unlock Round ${roundNumber}</p>
+            </div>
+    `;
+    return await sendViaEmailJS(email, subject, html);
+}
+
+async function sendGameCompletionEmail(email, teamName) {
+    const subject = `🏆 GAME COMPLETED - Congratulations!`;
+    const completionCode = `CRPT-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 20px; border: 2px solid #00ffcc;">
+                <h2 style="color: #00ffcc; text-align: center;">🎉 MISSION ACCOMPLISHED</h2>
+                <p>Team <strong>${teamName}</strong>,</p>
+                <p style="color: #ffcc00;">Incredible work! You have successfully completed all rounds of CODECRYPT.</p>
+                
+                <div style="background: linear-gradient(90deg, #333, #000); padding: 20px; text-align: center; border: 1px solid #ffcc00; margin: 20px 0;">
+                    <h1 style="color: #ffcc00; font-size: 30px; margin: 0;">ALL SYSTEMS SECURED</h1>
+                    <p style="color: #fff; font-size: 14px; margin-top: 15px;">You have proven your skills in cryptography, logic, and cybersecurity.</p>
+                    <div style="margin-top: 20px; padding: 10px; border: 1px dashed #00ffcc;">
+                        <p style="color: #00ffcc; margin: 0; font-size: 12px;">FINAL VERIFICATION CODE</p>
+                        <p style="color: #fff; font-size: 24px; font-weight: bold; margin: 5px 0;">${completionCode}</p>
+                        <p style="color: #999; margin: 0; font-size: 10px;">Enter this code to finish the game</p>
+                    </div>
                 </div>
-                <p style="color: #00ffcc;">No need to visit a physical location - you've earned this advantage!</p>
+                
+                <p style="color: #00ffcc;">Please report to the main desk for your final scoring and debriefing.</p>
                 <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">Sent by CODECRYPT System</p>
             </div>
     `;

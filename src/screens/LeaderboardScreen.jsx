@@ -74,7 +74,6 @@ const LeaderboardScreen = ({ onBack }) => {
                                 <th style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--text-secondary)', width: '80px' }}>RANK</th>
                                 <th style={{ padding: '1.2rem', textAlign: 'left', color: 'var(--text-secondary)' }}>OPERATIVE TEAM</th>
                                 <th style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>PROGRESS</th>
-                                <th style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>RETRIES</th>
                                 <th style={{ padding: '1.2rem', textAlign: 'right', color: 'var(--text-secondary)' }}>SCORE</th>
                             </tr>
                         </thead>
@@ -82,7 +81,7 @@ const LeaderboardScreen = ({ onBack }) => {
                             {leaderboard.map((team) => (
                                 <tr key={team.id} style={{
                                     borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                    background: team.name === localStorage.getItem('teamName') ? 'rgba(0, 255, 65, 0.05)' : 'transparent',
+                                    background: String(team.id) === String(localStorage.getItem('teamId')) ? 'rgba(0, 255, 65, 0.05)' : 'transparent',
                                     transition: 'background 0.2s'
                                 }} className="hover:bg-white/5">
                                     <td style={{ padding: '1.2rem', textAlign: 'center', fontWeight: 'bold', ...getRankStyle(team.rank) }}>
@@ -98,9 +97,6 @@ const LeaderboardScreen = ({ onBack }) => {
                                         ) : (
                                             `R${team.progress} :: S${team.stage}`
                                         )}
-                                    </td>
-                                    <td style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                        {team.retries}
                                     </td>
                                     <td style={{ padding: '1.2rem', textAlign: 'right', fontFamily: 'var(--font-code)', fontSize: '1.2rem', color: 'var(--accent-primary)', fontWeight: 'bold' }}>
                                         {team.score.toLocaleString()}
