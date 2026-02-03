@@ -104,10 +104,10 @@ const WinScreen = ({ state }) => {
 
 // Flash Challenge Component with Disclaimer and Retry Penalty
 const FlashChallengeContent = ({ levelData, retryCount = 0, onLock }) => {
-    const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
+    const [adjustedDuration, setAdjustedDuration] = useState(() => Math.max(5, levelData.flashDuration - (retryCount * 2)));
+    const [flashTimeLeft, setFlashTimeLeft] = useState(adjustedDuration);
     const [isLocked, setIsLocked] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(true);
-    const [adjustedDuration, setAdjustedDuration] = useState(levelData.flashDuration);
 
     useEffect(() => {
         // Calculate adjusted duration based on retries (reduce 2s per retry, minimum 5s)
@@ -353,10 +353,10 @@ const FlashChallengeContent = ({ levelData, retryCount = 0, onLock }) => {
 
 // Table Query Flash Component - Table stays visible, query flashes
 const TableQueryFlashContent = ({ levelData, retryCount = 0, onLock }) => {
-    const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
+    const [adjustedDuration, setAdjustedDuration] = useState(() => Math.max(5, levelData.flashDuration - (retryCount * 2)));
+    const [flashTimeLeft, setFlashTimeLeft] = useState(adjustedDuration);
     const [isQueryLocked, setIsQueryLocked] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(true);
-    const [adjustedDuration, setAdjustedDuration] = useState(levelData.flashDuration);
 
     useEffect(() => {
         // Calculate adjusted duration based on retries (reduce 2s per retry, minimum 5s)
@@ -1374,7 +1374,7 @@ const GameScreen = () => {
             } else {
                 setFeedbackMessage(result.message);
                 setShowFailure(true);
-                if (state.round === 3 && levelData?.type === 'FLASH_CHALLENGE') {
+                if (state.round === 3 && (levelData?.type === 'FLASH_CHALLENGE' || levelData?.type === 'TABLE_QUERY_FLASH')) {
                     setFlashRetryCount(prev => prev + 1);
                 }
             }
@@ -1386,7 +1386,7 @@ const GameScreen = () => {
     const handleRetry = () => {
         setInput('');
         setShowFailure(false);
-        setFlashRetryCount(0);
+        // Penalty persists until stage changes
     };
 
     const handleRetryPopup = () => {
