@@ -103,7 +103,7 @@ const WinScreen = ({ state }) => {
 };
 
 // Flash Challenge Component with Disclaimer and Retry Penalty
-const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
+const FlashChallengeContent = ({ levelData, retryCount = 0, onLock }) => {
     const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
     const [isLocked, setIsLocked] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(true);
@@ -129,6 +129,13 @@ const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
 
         return () => clearTimeout(timer);
     }, [flashTimeLeft, showDisclaimer, isLocked]);
+
+    useEffect(() => {
+        if (flashTimeLeft <= 0) {
+            setIsLocked(true);
+            if (onLock) onLock();
+        }
+    }, [flashTimeLeft]);
 
     const renderFlashData = () => {
         if (levelData.subType === 'TABLE_FLASH') {
@@ -345,7 +352,7 @@ const FlashChallengeContent = ({ levelData, retryCount = 0 }) => {
 };
 
 // Table Query Flash Component - Table stays visible, query flashes
-const TableQueryFlashContent = ({ levelData, retryCount = 0 }) => {
+const TableQueryFlashContent = ({ levelData, retryCount = 0, onLock }) => {
     const [flashTimeLeft, setFlashTimeLeft] = useState(levelData.flashDuration);
     const [isQueryLocked, setIsQueryLocked] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(true);
@@ -375,6 +382,7 @@ const TableQueryFlashContent = ({ levelData, retryCount = 0 }) => {
     useEffect(() => {
         if (flashTimeLeft <= 0) {
             setIsQueryLocked(true);
+            if (onLock) onLock();
         }
     }, [flashTimeLeft]);
 
@@ -1224,14 +1232,102 @@ const QueryFixingComponent = ({ levelData, onSubmitAll }) => {
     );
 };
 
+
+// --- FEEDBACK OVERLAY COMPONENT ---
+const FeedbackOverlay = ({ type, message, onRetry }) => {
+    const isSuccess = type === 'success';
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            animation: 'fadeIn 0.3s ease-out'
+        }}>
+            <style>
+                {`
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+                @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+                `}
+            </style>
+            <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                border: `2px solid ${isSuccess ? 'var(--accent-primary)' : 'var(--accent-error)'}`,
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: `0 0 50px ${isSuccess ? 'rgba(0, 255, 65, 0.2)' : 'rgba(255, 51, 51, 0.2)'}`,
+                background: 'rgba(10, 10, 10, 0.9)',
+                maxWidth: '90%',
+                width: '500px',
+                animation: 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            }}>
+                <div style={{
+                    fontSize: '4rem',
+                    marginBottom: '1rem',
+                    animation: 'pulse 2s infinite'
+                }}>
+                    {isSuccess ? '✅' : '🚫'}
+                </div>
+
+                <h2 className="glitch" data-text={isSuccess ? "ACCESS GRANTED" : "ACCESS DENIED"} style={{
+                    fontSize: '2.5rem',
+                    color: isSuccess ? 'var(--accent-primary)' : 'var(--accent-error)',
+                    marginBottom: '1rem'
+                }}>
+                    {isSuccess ? "ACCESS GRANTED" : "ACCESS DENIED"}
+                </h2>
+
+                <p style={{
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'var(--font-code)',
+                    fontSize: '1.1rem',
+                    marginBottom: '2rem'
+                }}>
+                    {message || (isSuccess ? 'MISSION PARAMETERS VALIDATED' : 'SECURITY BREACH DETECTED')}
+                </p>
+
+                {!isSuccess && (
+                    <button
+                        onClick={onRetry}
+                        className="btn btn-primary"
+                        style={{
+                            padding: '1rem 3rem',
+                            fontSize: '1.2rem',
+                            background: 'var(--accent-error)',
+                            border: 'none',
+                            color: 'white',
+                            boxShadow: '0 0 20px rgba(255, 51, 51, 0.4)'
+                        }}
+                    >
+                        RE-INITIALIZE ATTEMPT_
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const GameScreen = () => {
-    const { state, submitAnswer, error } = useGame();
+    const { state, submitAnswer, error: syncError } = useGame();
     const [input, setInput] = useState('');
     const [levelData, setLevelData] = useState(null);
-    const [showRetry, setShowRetry] = useState(false);
     const [resetKey, setResetKey] = useState(0);
-    const [isSubmitting, setIsSubmitting] = useState(false); // Prevent double-submission
-    const [flashRetryCount, setFlashRetryCount] = useState(0); // Track Round 3 retries for time penalty
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [flashRetryCount, setFlashRetryCount] = useState(0);
+    const [isFlashLocked, setIsFlashLocked] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showFailure, setShowFailure] = useState(false);
+    const [feedbackMessage, setFeedbackMessage] = useState('');
 
     // --- MISSION BRIEFING LOGIC ---
     const [showBriefing, setShowBriefing] = useState(false);
@@ -1245,15 +1341,15 @@ const GameScreen = () => {
     }, [state.round]); // Only trigger when round changes
 
 
-    // Initialize/Update Level Data
     useEffect(() => {
         if (state.screen === 'SUCCESS') return;
 
         const data = GameService.getStageData(state.round, state.stage);
         setLevelData(data);
         setInput('');
-        setShowRetry(false);
-        setFlashRetryCount(0); // Reset retry count for new stage
+        setShowFailure(false);
+        setIsFlashLocked(false);
+        setFlashRetryCount(0);
     }, [state.round, state.stage, state.screen]);
 
     if (state.screen === 'SUCCESS') {
@@ -1261,20 +1357,23 @@ const GameScreen = () => {
     }
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (isSubmitting) return; // Prevent double-submission
+        if (e) e.preventDefault();
+        if (isSubmitting) return;
 
         setIsSubmitting(true);
         try {
-            // Add minimum delay to ensure PROCESSING state is visible
             const [result] = await Promise.all([
                 submitAnswer(input),
-                new Promise(resolve => setTimeout(resolve, 500)) // Minimum 500ms delay
+                new Promise(resolve => setTimeout(resolve, 600))
             ]);
 
-            if (!result.success) {
-                setShowRetry(true);
-                // Increment retry count for Round 3 flash challenges
+            if (result.success) {
+                setFeedbackMessage(result.message);
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 1500);
+            } else {
+                setFeedbackMessage(result.message);
+                setShowFailure(true);
                 if (state.round === 3 && levelData?.type === 'FLASH_CHALLENGE') {
                     setFlashRetryCount(prev => prev + 1);
                 }
@@ -1284,67 +1383,55 @@ const GameScreen = () => {
         }
     };
 
-    const handleDragDropSubmit = async (query) => {
-        if (isSubmitting) return; // Prevent double-submission
+    const handleRetry = () => {
+        setInput('');
+        setShowFailure(false);
+        setFlashRetryCount(0);
+    };
 
+    const handleRetryPopup = () => {
+        handleRetry();
+    };
+
+    const wrapSubmission = async (fn, ...args) => {
+        if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            const result = await submitAnswer(query);
-            if (!result.success) {
-                setShowRetry(true);
+            const result = await fn(...args);
+            if (result.success) {
+                setFeedbackMessage(result.message);
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 1500);
+            } else {
+                setFeedbackMessage(result.message);
+                setShowFailure(true);
             }
+            return result;
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleRetry = () => {
-        setInput('');
-        setShowRetry(false);
-    };
+    const handleDragDropSubmit = (query) => wrapSubmission(submitAnswer, query);
 
     const handleRound4Submit = async (answers, setIncorrectQuestions) => {
-        if (isSubmitting) return; // Prevent double-submission
-
-        setIsSubmitting(true);
-        try {
-            const result = await submitAnswer(JSON.stringify(answers));
-            if (!result.success && result.incorrectQuestions) {
-                setIncorrectQuestions(result.incorrectQuestions);
-                setShowRetry(true);
-            }
-        } finally {
-            setIsSubmitting(false);
+        const result = await wrapSubmission(submitAnswer, JSON.stringify(answers));
+        if (result && !result.success && result.incorrectQuestions) {
+            setIncorrectQuestions(result.incorrectQuestions);
         }
     };
 
     const handleQueryMatching = async (mapping, setIncorrectQueries) => {
-        if (isSubmitting) return; // Prevent double-submission
-
-        setIsSubmitting(true);
-        try {
-            const result = await submitAnswer(JSON.stringify(mapping));
-            if (!result.success && result.incorrectQueries) {
-                setIncorrectQueries(result.incorrectQueries);
-                setShowRetry(true);
-            }
-        } finally {
-            setIsSubmitting(false);
+        const result = await wrapSubmission(submitAnswer, JSON.stringify(mapping));
+        if (result && !result.success && result.incorrectQueries) {
+            setIncorrectQueries(result.incorrectQueries);
         }
     };
 
     const handleQueryFixing = async (answers, setIncorrectQuestions) => {
-        if (isSubmitting) return; // Prevent double-submission
-
-        setIsSubmitting(true);
-        try {
-            const result = await submitAnswer(JSON.stringify(answers));
-            if (!result.success && result.incorrectQuestions) {
-                setIncorrectQuestions(result.incorrectQuestions);
-                setShowRetry(true);
-            }
-        } finally {
-            setIsSubmitting(false);
+        const result = await wrapSubmission(submitAnswer, JSON.stringify(answers));
+        if (result && !result.success && result.incorrectQuestions) {
+            setIncorrectQuestions(result.incorrectQuestions);
         }
     };
 
@@ -1500,33 +1587,11 @@ const GameScreen = () => {
                         // RECONSTRUCT THE CORRUPTED QUERY FRAGMENTS
                     </p>
 
-                    {error && (
-                        <div className="animate-fade-in" style={{
-                            marginBottom: '1.5rem',
-                            padding: '1rem',
-                            border: '1px solid var(--accent-error)',
-                            background: 'rgba(255, 51, 51, 0.1)',
-                            borderRadius: '4px'
-                        }}>
-                            <div style={{ color: 'var(--accent-error)', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                                ⚠ COMPILATION FAILED
-                            </div>
-                            <div style={{ color: '#fff', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                                {error}
-                            </div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '1rem' }}>
-                                // HINT: {levelData.hint}
-                            </div>
-                            <button
-                                className="btn btn-outline"
-                                style={{ borderColor: 'var(--accent-error)', color: 'var(--accent-error)' }}
-                                onClick={() => {
-                                    handleRetry();
-                                    setResetKey(prev => prev + 1);
-                                }}
-                            >
-                                ↺ RESET SEGMENTS
-                            </button>
+                    {syncError && (
+                        <div className="animate-fade-in" style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid var(--accent-error)', background: 'rgba(255, 51, 51, 0.1)', borderRadius: '4px' }}>
+                            <div style={{ color: 'var(--accent-error)', fontWeight: 'bold', marginBottom: '0.5rem' }}>⚠ COMPILATION FAILED</div>
+                            <div style={{ color: '#fff', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{syncError}</div>
+                            <button className="btn btn-outline" style={{ borderColor: 'var(--accent-error)', color: 'var(--accent-error)' }} onClick={() => { handleRetry(); setResetKey(prev => prev + 1); }}>↺ RESET SEGMENTS</button>
                         </div>
                     )}
 
@@ -1540,11 +1605,11 @@ const GameScreen = () => {
         }
 
         if (levelData.type === 'FLASH_CHALLENGE') {
-            return <FlashChallengeContent levelData={levelData} retryCount={flashRetryCount} />;
+            return <FlashChallengeContent levelData={levelData} retryCount={flashRetryCount} onLock={() => setIsFlashLocked(true)} />;
         }
 
         if (levelData.type === 'TABLE_QUERY_FLASH') {
-            return <TableQueryFlashContent levelData={levelData} retryCount={flashRetryCount} />;
+            return <TableQueryFlashContent levelData={levelData} retryCount={flashRetryCount} onLock={() => setIsFlashLocked(true)} />;
         }
 
         if (levelData.type === 'DATA_ANALYSIS') {
@@ -1696,6 +1761,8 @@ const GameScreen = () => {
                     'QUERY_FIXING',
                     'SQL_REASONING_MULTI'
                 ].includes(levelData.type) && (
+                        (levelData.type !== 'FLASH_CHALLENGE' && levelData.type !== 'TABLE_QUERY_FLASH') || isFlashLocked
+                    ) && (
                         <form onSubmit={handleSubmit}>
                             <div style={{ marginBottom: '1.5rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-secondary)' }}>
@@ -1713,7 +1780,7 @@ const GameScreen = () => {
                                         width: '100%',
                                         padding: '1rem',
                                         background: 'var(--bg-primary)',
-                                        border: error ? '1px solid var(--accent-error)' : '1px solid var(--accent-primary)',
+                                        border: showFailure ? '1px solid var(--accent-error)' : '1px solid var(--accent-primary)',
                                         color: 'var(--text-primary)',
                                         fontSize: '1.1rem',
                                         outline: 'none',
@@ -1726,44 +1793,7 @@ const GameScreen = () => {
                                 />
                             </div>
 
-                            {error && (
-                                <div style={{
-                                    color: 'var(--accent-error)',
-                                    marginBottom: '1rem',
-                                    padding: '0.75rem',
-                                    background: 'rgba(255, 51, 51, 0.1)',
-                                    borderLeft: '4px solid var(--accent-error)',
-                                    fontFamily: 'var(--font-code)',
-                                    fontSize: '0.9rem'
-                                }}>
-                                    [ERROR]: {error}
-                                </div>
-                            )}
-
-                            {showRetry && (
-                                <div style={{
-                                    background: 'rgba(255, 204, 0, 0.1)',
-                                    border: '1px solid var(--accent-warning)',
-                                    padding: '1rem',
-                                    marginBottom: '1rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}>
-                                    <span style={{ color: 'var(--accent-warning)' }}>
-                                        ⚠ Incorrect answer. Try again?
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={handleRetry}
-                                        className="btn btn-outline"
-                                        style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
-                                    >
-                                        RETRY
-                                    </button>
-                                </div>
-                            )}
+                            {/* Overlays handle these now */}
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -1809,6 +1839,8 @@ const GameScreen = () => {
                         </form>
                     )}
             </div>
+            {showSuccess && <FeedbackOverlay type="success" message={feedbackMessage} />}
+            {showFailure && <FeedbackOverlay type="failure" message={feedbackMessage} onRetry={handleRetryPopup} />}
         </div>
     );
 };

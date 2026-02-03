@@ -35,7 +35,7 @@ const CompletionScreen = () => {
 
     const fetchBreakdown = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/teams/${state.teamId}/breakdown`);
+            const response = await fetch(`${API_BASE_URL}/teams/${state.teamId}/breakdown`);
             if (response.ok) {
                 const data = await response.json();
                 setBreakdown(data);
@@ -72,7 +72,7 @@ const CompletionScreen = () => {
             // 1. Fetch Live Leaderboard
             let lbData = [];
             try {
-                const lbResponse = await fetch(`${SERVER_URL}/api/leaderboard/live`);
+                const lbResponse = await fetch(`${SERVER_URL}/leaderboard/live`);
                 if (lbResponse.ok) {
                     lbData = await lbResponse.json();
                 }
@@ -85,7 +85,7 @@ const CompletionScreen = () => {
             let personalData = null;
             if (state.teamId) {
                 try {
-                    const statsResponse = await fetch(`${SERVER_URL}/api/teams/${state.teamId}/state`);
+                    const statsResponse = await fetch(`${SERVER_URL}/teams/${state.teamId}/state`);
                     if (statsResponse.ok) {
                         personalData = await statsResponse.json();
                     }

@@ -350,6 +350,7 @@ export function GameProvider({ children }) {
             // Better: Dispatch ADMIN_OVERRIDE-like update for score to be perfect?
             // Actually, let's update NEXT_STAGE reducer to handle this cleaner later, but for now:
             if (typeof backendResult?.newTotalScore === 'number') {
+                console.log(`[SCORING] Absolute Sync with Backend: ${backendResult.newTotalScore}`);
                 dispatch({
                     type: ACTION.ADMIN_OVERRIDE,
                     payload: { score: backendResult.newTotalScore }

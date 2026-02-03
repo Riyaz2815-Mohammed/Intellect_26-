@@ -20,7 +20,7 @@ export const GameService = {
                 const normalizedAnswer = normalizeSQL(challenge.answer);
 
                 if (normalizedInput === normalizedAnswer) {
-                    return { success: true, points: 50, message: 'QUERY EXECUTED SUCCESSFULLY' };
+                    return { success: true, points: 100, message: 'QUERY EXECUTED SUCCESSFULLY' };
                 } else {
                     return { success: false, message: 'SYNTAX ERROR: QUERY MALFORMED OR INCORRECT ORDER' };
                 }
@@ -51,7 +51,7 @@ export const GameService = {
                 const forbidden = question.validation.forbidden.find(t => cleanInput.includes(t));
                 if (forbidden) return { success: false, message: `SYNTAX ERROR: Usage of '${forbidden.toUpperCase()}' is restricted` };
 
-                return { success: true, points: 100, message: 'QUERY EXECUTED SUCCESSFULLY' };
+                return { success: true, points: 150, message: 'QUERY EXECUTED SUCCESSFULLY' };
             }
 
             // Stage 5: Code Entry
@@ -97,7 +97,7 @@ export const GameService = {
                 // Q3: Logical decision - exact match
                 if (question.type === 'LOGICAL_DECISION') {
                     if (input.trim().toUpperCase() === question.answer.toUpperCase()) {
-                        return { success: true, points: 150, message: 'DECISION VALIDATED' };
+                        return { success: true, points: 200, message: 'DECISION VALIDATED' };
                     } else {
                         return { success: false, message: 'INCORRECT STRATEGIC CHOICE' };
                     }

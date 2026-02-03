@@ -299,9 +299,9 @@ app.get('/api/teams/:teamId/state', async (req, res) => {
             timeTaken: allStatsMap[t.team_id] || 0
         })).sort((a, b) => {
             if (b.score !== a.score) return b.score - a.score;
+            if (a.timeTaken !== b.timeTaken) return a.timeTaken - b.timeTaken;
             if (b.progress !== a.progress) return b.progress - a.progress;
-            if (b.stage !== a.stage) return b.stage - a.stage;
-            return a.timeTaken - b.timeTaken;
+            return b.stage - a.stage;
         });
 
         const myRank = sortedTeams.findIndex(t => String(t.id) === String(teamId)) + 1;
@@ -712,12 +712,12 @@ app.get('/api/leaderboard/live', async (req, res) => {
             // 1. Score (High to Low)
             if (b.score !== a.score) return b.score - a.score;
 
-            // 2. Progress (High to Low) - Who is further ahead?
-            if (b.progress !== a.progress) return b.progress - a.progress;
-            if (b.stage !== a.stage) return b.stage - a.stage;
+            // 2. Time Taken (Low to High) - Faster is better (Primary Tie-Breaker)
+            if (a.timeTaken !== b.timeTaken) return a.timeTaken - b.timeTaken;
 
-            // 3. Time Taken (Low to High) - Faster is better
-            return a.timeTaken - b.timeTaken;
+            // 3. Progress (High to Low) - Who is further ahead?
+            if (b.progress !== a.progress) return b.progress - a.progress;
+            return b.stage - a.stage;
         });
 
         // Assign Ranks
